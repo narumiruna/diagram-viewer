@@ -412,6 +412,37 @@ describe("diagram view", () => {
     controller.destroy()
   })
 
+  it("returns to overview if a hidden refresh invalidates the focus region", () => {
+    const { stage, viewport } = fixture()
+    const focusRegion = { x: 600, y: 200, width: 250, height: 150 }
+    const controller = createDiagramView(viewport, stage, { focusRegion })
+    try {
+      controller.zoomBy(0.8)
+      const manualView = { ...controller.getState() }
+      expect(manualView).toMatchObject({ cameraMode: "focus", scale: 1.6, userModified: true })
+
+      viewport.hidden = true
+      controller.refresh()
+      viewport.hidden = false
+      controller.refresh()
+      expect(controller.getState()).toEqual(manualView)
+
+      viewport.hidden = true
+      stage.innerHTML = '<svg viewBox="0 0 800 500"></svg>'
+      controller.refresh()
+      expect(stage).not.toHaveAttribute("data-ndv-focus-region")
+      viewport.hidden = false
+      controller.refresh()
+      expect(controller.getState()).toMatchObject({
+        cameraMode: "overview",
+        scale: 0.6,
+        userModified: false,
+      })
+    } finally {
+      controller.destroy()
+    }
+  })
+
   it("reserves bare arrows and only consumes handled viewport shortcuts", () => {
     const { stage, viewport } = fixture()
     const navigated = vi.fn()

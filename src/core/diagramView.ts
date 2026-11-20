@@ -323,13 +323,13 @@ export function createDiagramView(
       region.y + region.height <= state.naturalHeight
         ? region
         : undefined
-    const focusChanged = resolved !== activeRegion
+    if (resolved !== activeRegion && cameraMode === "focus") state.userModified = false
     updateFocusFrame(resolved)
     if (viewport.hidden) return
     updateInlineHeight()
     previousWidth = viewport.clientWidth
     previousHeight = viewport.clientHeight
-    if (forceCamera || !state.userModified || (focusChanged && cameraMode === "focus")) {
+    if (forceCamera || !state.userModified) {
       state.userModified = false
       applyCameraMode()
       return

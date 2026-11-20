@@ -157,6 +157,10 @@ interface ScrollLockRecord {
 // There is no DOM access at module import time.
 const fallbackOwners = new WeakMap<Document, () => boolean>()
 
+function snapshotOptions({ focusRegion, ...options }: DiagramOptions): DiagramOptions {
+  return { ...options, focusRegion: focusRegion && { ...focusRegion } }
+}
+
 /** Browser-only instance; importing this module does not access browser globals. */
 export function createDiagramController(
   elements: { root: HTMLElement; viewport: HTMLElement; stage: HTMLElement },
@@ -164,7 +168,7 @@ export function createDiagramController(
 ): DiagramController {
   const { root, viewport, stage } = elements
   const document = root.ownerDocument
-  let options = { ...initialOptions }
+  let options = snapshotOptions(initialOptions)
   let state = initialDiagramState
   let message = ""
   let destroyed = false
@@ -441,7 +445,7 @@ export function createDiagramController(
       if (!focusChanged && keys.every((key) => key === "focusRegion" || options[key] === next[key]))
         return
       const changed = options.svg !== next.svg || options.ready !== next.ready
-      options = { ...next }
+      options = snapshotOptions(next)
       if (focusChanged) camera.setFocusRegion(options.focusRegion)
       publish({}, true)
       if (changed) nextFrame(refresh)
