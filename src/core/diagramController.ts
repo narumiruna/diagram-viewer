@@ -293,12 +293,7 @@ export function createDiagramController(
   }
 
   function refresh(): void {
-    if (destroyed) return
-    if (options.ready === false) {
-      camera.cancelGestures()
-      return
-    }
-    if (options.svg && !stage.querySelector("svg")) return
+    if (destroyed || options.ready === false || (options.svg && !stage.querySelector("svg"))) return
     camera.refresh()
   }
 

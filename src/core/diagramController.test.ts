@@ -201,46 +201,52 @@ describe("diagram controller", () => {
     expect(controller.getAction("fit").disabled).toBe(false)
   })
 
-  it("releases an active drag when readiness is lost without refreshing loading content", () => {
-    const { controller, stage, viewport } = fixture()
-    const capture = vi.spyOn(viewport, "setPointerCapture")
-    const release = vi.spyOn(viewport, "releasePointerCapture")
-    controller.run("zoomIn")
-    const transform = stage.style.transform
-    viewport.dispatchEvent(
-      new PointerEvent("pointerdown", {
-        bubbles: true,
+  it.each([false, true])(
+    "releases an active drag at readiness loss (SVG missing: %s)",
+    (missing) => {
+      const options = { source: "source", svg: "trusted SVG" }
+      const { controller, stage, viewport } = fixture(options)
+      const capture = vi.spyOn(viewport, "setPointerCapture")
+      const release = vi.spyOn(viewport, "releasePointerCapture")
+      controller.run("zoomIn")
+      const transform = stage.style.transform
+      viewport.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 7,
+          pointerType: "mouse",
+          isPrimary: true,
+          clientX: 250,
+          clientY: 150,
+        }),
+      )
+      expect(capture).toHaveBeenCalledWith(7)
+
+      stage.innerHTML = missing ? "" : '<svg viewBox="0 0 250 100"></svg>'
+      const query = vi.spyOn(stage, "querySelector")
+      controller.update({ ...options, ready: false })
+      expect(release).toHaveBeenCalledExactlyOnceWith(7)
+      flushFrames()
+      expect(query).not.toHaveBeenCalled()
+      expect(stage.style.width).toBe("1000px")
+      expect(stage.style.transform).toBe(transform)
+
+      stage.innerHTML = '<svg viewBox="0 0 1000 500"></svg>'
+      controller.update({ ...options, ready: true })
+      flushFrames()
+      const move = new PointerEvent("pointermove", {
         cancelable: true,
         pointerId: 7,
         pointerType: "mouse",
-        isPrimary: true,
-        clientX: 250,
+        clientX: 200,
         clientY: 150,
-      }),
-    )
-    expect(capture).toHaveBeenCalledWith(7)
-
-    stage.innerHTML = '<svg viewBox="0 0 250 100"></svg>'
-    controller.update({ source: "source", ready: false })
-    expect(release).toHaveBeenCalledWith(7)
-    flushFrames()
-    expect(stage.style.width).toBe("1000px")
-    expect(stage.style.transform).toBe(transform)
-
-    stage.innerHTML = '<svg viewBox="0 0 1000 500"></svg>'
-    controller.update({ source: "source", ready: true })
-    flushFrames()
-    const move = new PointerEvent("pointermove", {
-      cancelable: true,
-      pointerId: 7,
-      pointerType: "mouse",
-      clientX: 200,
-      clientY: 150,
-    })
-    document.dispatchEvent(move)
-    expect(move.defaultPrevented).toBe(false)
-    expect(stage.style.transform).toBe(transform)
-  })
+      })
+      document.dispatchEvent(move)
+      expect(move.defaultPrevented).toBe(false)
+      expect(stage.style.transform).toBe(transform)
+    },
+  )
 
   it("refreshes host-owned content without replacing chart children", () => {
     const { controller, stage } = fixture()
@@ -254,33 +260,6 @@ describe("diagram controller", () => {
     stage.innerHTML = '<svg viewBox="0 0 250 100"></svg>'
     controller.refresh()
     expect(controller.getState().scale).toBe(1)
-  })
-
-  it.each([false, true])("releases suspended gestures with missing SVG: %s", (missingSvg) => {
-    const { controller, viewport, stage } = fixture({ source: "text", svg: "SVG", ready: true })
-    controller.run("zoomIn")
-    const before = controller.getState()
-    const transform = stage.style.transform
-    const capture = vi.spyOn(viewport, "setPointerCapture")
-    const release = vi.spyOn(viewport, "releasePointerCapture")
-    const down = new Event("pointerdown", { bubbles: true, cancelable: true })
-    Object.defineProperties(down, {
-      pointerId: { value: 7 },
-      pointerType: { value: "mouse" },
-      button: { value: 0 },
-      clientX: { value: 250 },
-      clientY: { value: 150 },
-    })
-    viewport.dispatchEvent(down)
-    expect(capture).toHaveBeenCalledWith(7)
-    stage.innerHTML = missingSvg ? "" : '<svg viewBox="0 0 250 100"></svg>'
-    const query = vi.spyOn(stage, "querySelector")
-    controller.update({ source: "text", svg: "SVG", ready: false })
-    flushFrames()
-    expect(release).toHaveBeenCalledExactlyOnceWith(7)
-    expect(query).not.toHaveBeenCalled()
-    expect(controller.getState().scale).toBe(before.scale)
-    expect(stage.style.transform).toBe(transform)
   })
 
   it("keeps pure action metadata usable before a mounted controller", () => {
