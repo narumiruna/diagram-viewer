@@ -118,6 +118,27 @@ describe("diagram controller", () => {
     expect(listener).toHaveBeenCalledOnce()
   })
 
+  it("compares focus coordinates against the last accepted options", () => {
+    const focusRegion = { x: 600, y: 200, width: 250, height: 150 }
+    const options = { source: "text", focusRegion }
+    const { controller, stage } = fixture(options)
+    expect(stage.style.getPropertyValue("--ndv-region-x")).toBe("600px")
+
+    focusRegion.x = 100
+    controller.update(options)
+    expect(stage.style.getPropertyValue("--ndv-region-x")).toBe("100px")
+
+    controller.run("fit")
+    const overview = controller.getState()
+    controller.update({ ...options, focusRegion: { ...focusRegion } })
+    expect(controller.getState()).toBe(overview)
+
+    focusRegion.x = 300
+    controller.update({ ...options, focusRegion: { ...focusRegion } })
+    expect(stage.style.getPropertyValue("--ndv-region-x")).toBe("300px")
+    expect(controller.getState().scale).toBe(2)
+  })
+
   it("guards exact zoom bounds, including fitted scales below the interactive floor", () => {
     const { controller, stage } = fixture()
     stage.innerHTML = '<svg viewBox="0 0 5000 500"></svg>'

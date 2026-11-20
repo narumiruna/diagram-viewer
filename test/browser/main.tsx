@@ -10,7 +10,7 @@ import {
   useDiagramAction,
 } from "@narumitw/diagram-viewer"
 import "@narumitw/diagram-viewer/styles.css"
-import { type CSSProperties, useEffect, useRef, useState } from "react"
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react"
 import { createRoot } from "react-dom/client"
 import embed, { type Result } from "vega-embed"
 import { classSource, classSvg, sequenceSource, sequenceSvg } from "./fixtures"
@@ -135,6 +135,64 @@ function LiveChart() {
   )
 }
 
+const slideSVG = `<svg viewBox="0 0 1000 500" xmlns="http://www.w3.org/2000/svg">
+  <rect id="client-node" x="350" y="200" width="160" height="80" rx="8" fill="#9dc5ff"/>
+  <text x="370" y="245">Client</text>
+  <rect id="server-node" x="650" y="250" width="160" height="80" rx="8" fill="#9dc5ff"/>
+  <text x="670" y="295">Server</text>
+</svg>`
+
+const slides = [
+  { title: "Overview" },
+  { title: "Client detail", region: { x: 340, y: 190, width: 180, height: 100 } },
+  { title: "Server detail", region: { x: 640, y: 240, width: 180, height: 100 } },
+]
+
+function SlideDeck() {
+  const [index, setIndex] = useState(0)
+
+  const advance = useCallback((by: number) => {
+    setIndex((current) => Math.min(slides.length - 1, Math.max(0, current + by)))
+  }, [])
+
+  useEffect(() => {
+    function navigate(event: KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        event.shiftKey ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey
+      )
+        return
+      if (event.key === "ArrowRight") advance(1)
+      if (event.key === "ArrowLeft") advance(-1)
+    }
+    document.addEventListener("keydown", navigate)
+    return () => document.removeEventListener("keydown", navigate)
+  }, [advance])
+
+  const slide = slides[index]
+  return (
+    <main>
+      <h1>{slide.title}</h1>
+      <button type="button" onClick={() => advance(-1)} disabled={index === 0}>
+        Previous slide
+      </button>
+      <button type="button" onClick={() => advance(1)} disabled={index === slides.length - 1}>
+        Next slide
+      </button>
+      <DiagramViewer
+        source="client -> server"
+        svg={slideSVG}
+        focusRegion={slide.region}
+        keyboardPan="shift-arrows"
+        graphicName="request diagram"
+      />
+    </main>
+  )
+}
+
 function App() {
   const [showClass, setShowClass] = useState(initialClass)
   const [mounted, setMounted] = useState(true)
@@ -210,4 +268,4 @@ function App() {
 
 const root = document.getElementById("root")
 if (!root) throw new Error("Missing fixture root")
-createRoot(root).render(<App />)
+createRoot(root).render(params.has("focus") ? <SlideDeck /> : <App />)

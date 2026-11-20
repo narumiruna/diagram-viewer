@@ -94,9 +94,47 @@ zoomOut zoomIn fit reset fullscreen source copy svg png retry
 ```
 
 `useDiagramState()` exposes an immutable snapshot with exact scale bounds,
-cropping, source visibility, fullscreen/fallback state, async action flags, and
-status. It observes the same core controller used by all buttons. Zoom labels
-are rounded for display; disabled bounds use the exact values.
+cropping, focus-region availability, source visibility, fullscreen/fallback
+state, async action flags, and status. It observes the same core controller
+used by all buttons. Zoom labels are rounded for display; disabled bounds use
+the exact values.
+
+## Slide focus and keyboard controls
+
+Pass a `focusRegion` to `DiagramViewer` or `DiagramRoot` to zoom in on a
+rectangle over the same SVG. The host maps nodes to the rectangle. Use CSS
+pixels in the unscaled stage, measured from its top-left corner, not screen
+coordinates or an SVG's nonzero `viewBox` origin.
+
+```tsx
+<DiagramViewer
+  source={source}
+  svg={sanitizedSvg}
+  focusRegion={activeSlide.region}
+  keyboardPan="shift-arrows"
+/>
+```
+
+- Changing the rectangle opens its detail view without replacing the SVG.
+  Omit it on overview slides. A rectangle outside the SVG or with invalid
+  dimensions falls back to the overview.
+- **Fit to screen** shows the whole SVG and keeps the frame. **Reset to slide
+  focus** restores the detail view. Without a region, **Reset zoom** still
+  selects the readable scale.
+- `keyboardPan="shift-arrows"` makes Shift + arrow keys pan the focused
+  viewport. Plain arrows remain available to the host for slide navigation.
+  The default still pans with plain arrows. In either mode, `+` and `-` zoom
+  and `0` fits the diagram. Camera shortcuts do not take over nested controls.
+
+The framework-independent controller accepts the same options in
+`createDiagramController()` and `update()`. Call `camera.setFocusRegion(rect)`
+when using the lower-level `createDiagramView()` directly.
+`camera.setFocusRegion()` clears the rectangle; `getKeyboardPan` can return
+`"shift-arrows"` for a host-owned viewport. The core sets
+`data-ndv-focus-region` and the `--ndv-region-{x,y,width,height}` custom
+properties on the stage while a valid rectangle is available. The package
+stylesheet draws the frame on `.ndv-stage`; hosts with their own styles can
+use these attributes to draw it themselves.
 
 ## Host-owned chart mount
 
@@ -150,7 +188,8 @@ Buttons have accessible names, visible focus, 44-pixel default targets, and
 keyboard/pointer tooltips inside the viewer, including fullscreen. Source is a
 named, keyboard-scrollable text region. Copy and export results use polite
 status feedback. Inline touch scrolls the page; expanded touch pans/pinches.
-Fit selects an overview; reset selects readable labels and can crop the image.
+Fit selects an overview; reset returns to the focus region or selects a readable
+scale if no region is set.
 
 Fullscreen keeps the live DOM node. If the native API fails, the existing
 in-place fallback isolates background siblings with `inert`, locks scroll

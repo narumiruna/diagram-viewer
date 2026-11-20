@@ -337,6 +337,146 @@ describe("diagram view", () => {
     controller.destroy()
   })
 
+  it("fits a region, preserves it in overview, and refocuses on resize and reset", () => {
+    const { stage, viewport } = fixture()
+    const region = { x: 600, y: 200, width: 250, height: 150 }
+    const controller = createDiagramView(viewport, stage, { focusRegion: region })
+    expect(controller.getState()).toMatchObject({
+      cameraMode: "focus",
+      scale: 2,
+      x: -1200,
+      y: -400,
+    })
+    expect(stage).toHaveAttribute("data-ndv-focus-region")
+    expect(stage.style.getPropertyValue("--ndv-region-x")).toBe("600px")
+
+    controller.setCameraMode("overview")
+    controller.setFocusRegion({ ...region })
+    expect(controller.getState()).toMatchObject({ cameraMode: "overview", scale: 0.5 })
+    expect(stage).toHaveAttribute("data-ndv-focus-region")
+    controller.reset()
+    expect(controller.getState().scale).toBe(2)
+    Object.defineProperty(viewport, "clientWidth", { value: 375 })
+    controller.refresh()
+    expect(controller.getState()).toMatchObject({ cameraMode: "focus", scale: 1.5 })
+    controller.setFocusRegion(undefined)
+    expect(controller.getState()).toMatchObject({ cameraMode: "overview", scale: 0.375 })
+    expect(stage).not.toHaveAttribute("data-ndv-focus-region")
+    controller.reset()
+    expect(controller.getState()).toMatchObject({ cameraMode: "readable", scale: 1.4 })
+    controller.destroy()
+  })
+
+  it("falls back for an invalid or unresolved region and refreshes once the SVG exists", () => {
+    const { stage, viewport } = fixture()
+    const svg = stage.firstElementChild
+    stage.replaceChildren()
+    const region = { x: 600, y: 200, width: 250, height: 150 }
+    const controller = createDiagramView(viewport, stage, { focusRegion: region })
+    expect(controller.getState().cameraMode).toBe("overview")
+    expect(stage).not.toHaveAttribute("data-ndv-focus-region")
+
+    if (!svg) throw new Error("Missing fixture SVG")
+    stage.append(svg)
+    controller.refresh()
+    expect(controller.getState().cameraMode).toBe("focus")
+    controller.setFocusRegion({ ...region, x: 999 })
+    expect(controller.getState().cameraMode).toBe("overview")
+    expect(stage).not.toHaveAttribute("data-ndv-focus-region")
+    controller.setFocusRegion({ ...region, width: Infinity })
+    expect(stage).not.toHaveAttribute("data-ndv-focus-region")
+
+    controller.setFocusRegion(region)
+    controller.destroy()
+    expect(stage).not.toHaveAttribute("data-ndv-focus-region")
+    expect(stage.style.getPropertyValue("--ndv-region-x")).toBe("")
+  })
+
+  it("applies a changed region when returning from source after a manual zoom", () => {
+    const { stage, viewport } = fixture()
+    const region = { x: 600, y: 200, width: 250, height: 150 }
+    const controller = createDiagramView(viewport, stage, { focusRegion: region })
+    controller.zoomBy(0.8)
+    expect(controller.getState()).toMatchObject({ scale: 1.6, userModified: true })
+    viewport.hidden = true
+    controller.setFocusRegion({ x: 100, y: 100, width: 300, height: 200 })
+    viewport.hidden = false
+    controller.refresh()
+    expect(controller.getState()).toMatchObject({
+      cameraMode: "focus",
+      scale: 1.5,
+      x: -125,
+      y: -150,
+      userModified: false,
+    })
+    controller.destroy()
+  })
+
+  it("returns to overview if a hidden refresh invalidates the focus region", () => {
+    const { stage, viewport } = fixture()
+    const focusRegion = { x: 600, y: 200, width: 250, height: 150 }
+    const controller = createDiagramView(viewport, stage, { focusRegion })
+    try {
+      controller.zoomBy(0.8)
+      const manualView = { ...controller.getState() }
+      expect(manualView).toMatchObject({ cameraMode: "focus", scale: 1.6, userModified: true })
+
+      viewport.hidden = true
+      controller.refresh()
+      viewport.hidden = false
+      controller.refresh()
+      expect(controller.getState()).toEqual(manualView)
+
+      viewport.hidden = true
+      stage.innerHTML = '<svg viewBox="0 0 800 500"></svg>'
+      controller.refresh()
+      expect(stage).not.toHaveAttribute("data-ndv-focus-region")
+      viewport.hidden = false
+      controller.refresh()
+      expect(controller.getState()).toMatchObject({
+        cameraMode: "overview",
+        scale: 0.6,
+        userModified: false,
+      })
+    } finally {
+      controller.destroy()
+    }
+  })
+
+  it("reserves bare arrows and only consumes handled viewport shortcuts", () => {
+    const { stage, viewport } = fixture()
+    const navigated = vi.fn()
+    document.body.addEventListener("keydown", navigated)
+    const controller = createDiagramView(viewport, stage, { getKeyboardPan: () => "shift-arrows" })
+    try {
+      controller.reset()
+      const before = controller.getState().x
+      const bare = new KeyboardEvent("keydown", {
+        key: "ArrowRight",
+        bubbles: true,
+        cancelable: true,
+      })
+      viewport.dispatchEvent(bare)
+      expect(bare.defaultPrevented).toBe(false)
+      expect(navigated).toHaveBeenCalledExactlyOnceWith(bare)
+      expect(controller.getState().x).toBe(before)
+
+      const shifted = new KeyboardEvent("keydown", {
+        key: "ArrowRight",
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      viewport.dispatchEvent(shifted)
+      expect(shifted.defaultPrevented).toBe(true)
+      expect(navigated).toHaveBeenCalledOnce()
+      expect(controller.getState().x).toBeLessThan(before)
+    } finally {
+      controller.destroy()
+      document.body.removeEventListener("keydown", navigated)
+    }
+  })
+
   it.each(["span", "p"])("keeps HTML-only %s labels readable", (tag) => {
     const { stage, viewport } = fixture()
     stage.innerHTML = `<svg viewBox="0 0 1000 500"><foreignObject width="200" height="100"><div xmlns="http://www.w3.org/1999/xhtml"><${tag} style="font-size: 8px">Label</${tag}></div></foreignObject></svg>`

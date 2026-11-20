@@ -80,6 +80,61 @@ for (const kind of ["sequence", "class"]) {
   }
 }
 
+test("slide focus preserves the SVG and leaves plain arrows for deck navigation", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 640, height: 900 })
+  await page.goto("/?focus")
+  const card = page.locator(".ndv-root")
+  const viewport = card.getByRole("region", { name: /Shift \+ arrow keys/ })
+  const stage = card.locator(".ndv-stage")
+  const graphic = stage.locator("svg")
+  const zoom = card.getByLabel("Current zoom")
+  await expect(stage).not.toHaveCSS("transform", "none")
+  const overview = await transform(card)
+  const original = await graphic.elementHandle()
+  await expect(stage).not.toHaveAttribute("data-ndv-focus-region")
+  await viewport.focus()
+  await page.keyboard.press("ArrowRight")
+  await expect(page.getByRole("heading", { name: "Client detail" })).toBeVisible()
+  await expect(viewport).toBeFocused()
+  await expect(stage).toHaveAttribute("data-ndv-focus-region")
+  await expect(card.locator(".ndv-pan-hint")).toContainText("Shift + arrow keys")
+  const clientTransform = await transform(card)
+  const clientZoom = await zoom.textContent()
+  const frame = () =>
+    stage.evaluate((element) => {
+      const styles = getComputedStyle(element, "::after")
+      return { border: styles.borderStyle, left: styles.left, pointer: styles.pointerEvents }
+    })
+  expect(await frame()).toEqual({ border: "solid", left: "340px", pointer: "none" })
+  await page.emulateMedia({ forcedColors: "active" })
+  expect(await frame()).toMatchObject({ border: "dashed" })
+
+  await page.keyboard.press("Shift+ArrowRight")
+  expect(await transform(card)).not.toBe(clientTransform)
+  await expect(page.getByRole("heading", { name: "Client detail" })).toBeVisible()
+  await page.keyboard.press("0")
+  await expect.poll(() => transform(card)).toBe(overview)
+  await expect(stage).toHaveAttribute("data-ndv-focus-region")
+  await card.getByRole("button", { name: "Reset to slide focus" }).click()
+  await expect.poll(() => transform(card)).toBe(clientTransform)
+  await expect(zoom).toHaveText(clientZoom ?? "")
+
+  await viewport.focus()
+  await page.keyboard.press("ArrowRight")
+  await expect(page.getByRole("heading", { name: "Server detail" })).toBeVisible()
+  expect(await transform(card)).not.toBe(clientTransform)
+  expect(await frame()).toMatchObject({ left: "640px" })
+  await page.keyboard.press("ArrowLeft")
+  await page.keyboard.press("ArrowLeft")
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible()
+  await expect(stage).not.toHaveAttribute("data-ndv-focus-region")
+  await expect.poll(() => transform(card)).toBe(overview)
+  expect(await graphic.evaluate((node, svg) => node === svg, original)).toBe(true)
+  await original.dispose()
+})
+
 test("default controls and custom native button share actions without shared instance state", async ({
   page,
 }) => {

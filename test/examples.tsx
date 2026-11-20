@@ -1,5 +1,6 @@
 import {
   DiagramActionButton,
+  type DiagramRegion,
   DiagramRoot,
   DiagramSource,
   DiagramStatus,
@@ -18,6 +19,18 @@ const svg =
 
 export function DefaultExample() {
   return <DiagramViewer source="graph TD; A-->B" svg={svg} graphicName="Example diagram" />
+}
+
+export function SlideFocusExample({ region }: { region?: DiagramRegion }) {
+  return (
+    <DiagramViewer
+      source="graph TD; A-->B"
+      svg={svg}
+      graphicName="Example diagram"
+      focusRegion={region}
+      keyboardPan="shift-arrows"
+    />
+  )
 }
 
 export function AppZoomButton() {

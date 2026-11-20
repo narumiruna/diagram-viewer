@@ -23,7 +23,13 @@ import {
   initialDiagramState,
 } from "./core/index.js"
 
-export type { DiagramAction, DiagramOptions, DiagramState } from "./core/index.js"
+export type {
+  DiagramAction,
+  DiagramKeyboardPan,
+  DiagramOptions,
+  DiagramRegion,
+  DiagramState,
+} from "./core/index.js"
 
 interface DiagramContextValue {
   options: DiagramOptions
@@ -290,6 +296,7 @@ export function DiagramViewport({ className, stageRef }: DiagramViewportProps) {
     },
     [stage, stageRef],
   )
+  const panKeys = options.keyboardPan === "shift-arrows" ? "Shift + arrow keys" : "arrow keys"
   return (
     <section
       ref={viewport}
@@ -297,7 +304,7 @@ export function DiagramViewport({ className, stageRef }: DiagramViewportProps) {
       hidden={state.showSource}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: This viewport has scoped keyboard pan and zoom controls.
       tabIndex={0}
-      aria-label={`Interactive ${graphicName}. Use arrow keys to pan, plus or minus to zoom, and zero to fit.`}
+      aria-label={`Interactive ${graphicName}. Use ${panKeys} to pan, plus or minus to zoom, and zero to fit.`}
     >
       <div
         ref={setStage}
@@ -344,13 +351,12 @@ export function DiagramStatus() {
 }
 
 export function DiagramPanHint() {
-  const { state } = useDiagramContext()
+  const { options, state } = useDiagramContext()
   if (!state.cropped || state.showSource) return null
+  const panKeys = options.keyboardPan === "shift-arrows" ? "Shift + arrow keys" : "arrow keys"
   return (
     <p className="ndv-pan-hint diagram-pan-hint">
-      {state.expanded
-        ? "Drag to pan; use two fingers to pan and zoom."
-        : "Diagram cropped for readable labels. Drag or use arrow keys to pan."}
+      {`Drag or use ${panKeys} to pan.${state.expanded ? " Use two fingers to pan and zoom." : ""}`}
     </p>
   )
 }
