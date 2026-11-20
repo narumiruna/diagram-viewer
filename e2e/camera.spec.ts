@@ -169,6 +169,29 @@ test("hidden viewport ignores camera input and preserves the zoom when shown", a
   expect(await cameraTransform(page)).not.toBe(before)
 })
 
+test("a stage hidden by CSS ignores wheel zoom inside a visible viewport", async ({ page }) => {
+  await openCamera(page, false)
+  const viewport = page.locator("#viewport")
+  const stage = page.locator("#stage")
+  const before = await cameraTransform(page)
+  await stage.evaluate((element) => {
+    element.style.display = "none"
+  })
+  const accepted = await viewport.evaluate((element) =>
+    element.dispatchEvent(
+      new WheelEvent("wheel", { cancelable: true, ctrlKey: true, deltaY: -100 }),
+    ),
+  )
+  expect(accepted).toBe(true)
+
+  await stage.evaluate((element) => {
+    element.style.removeProperty("display")
+  })
+  expect(await cameraTransform(page)).toBe(before)
+  await viewport.dispatchEvent("wheel", { cancelable: true, ctrlKey: true, deltaY: -100 })
+  expect(await cameraTransform(page)).not.toBe(before)
+})
+
 test("destroy releases active capture and all camera behavior", async ({ page }) => {
   const touch = await openCamera(page)
   await touch("touchStart", [[1, 280, 100]])
