@@ -71,6 +71,21 @@ export function SelectableNodeCameraExample(
   return createDiagramView(viewport, stage, { isExpanded })
 }
 
+/** The host owns viewport size and signals when its current diagram accepts input. */
+export function HostSizedCameraExample(
+  viewport: HTMLElement,
+  stage: HTMLElement,
+  isReady: () => boolean,
+) {
+  return createDiagramView(viewport, stage, {
+    manageInlineHeight: false,
+    resetMode: "native",
+    focusMaxScale: 2,
+    isInteractionEnabled: isReady,
+    getKeyboardPan: () => "shift-arrows",
+  })
+}
+
 /** The host renderer owns and finalizes children; ready signals completion. */
 export function HostMountExample() {
   const stage = useRef<HTMLDivElement>(null)

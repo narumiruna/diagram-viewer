@@ -300,7 +300,7 @@ export function createDiagramController(
   const camera = createDiagramView(viewport, stage, {
     focusRegion: options.focusRegion,
     getKeyboardPan: () => options.keyboardPan,
-    isKeyboardEnabled: () => options.ready !== false && !state.showSource,
+    isInteractionEnabled: () => options.ready !== false && !state.showSource,
     isExpanded: () => document.fullscreenElement === root || state.fallback,
     onCropChange: (cropped) => publish({ cropped }),
     onEscape: closeFallback,

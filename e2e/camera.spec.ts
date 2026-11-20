@@ -148,6 +148,27 @@ test("inline node touch scrolls the page without moving the camera", async ({ pa
   expect(await cameraTransform(page)).toBe(before)
 })
 
+test("hidden viewport ignores camera input and preserves the zoom when shown", async ({ page }) => {
+  await openCamera(page, false)
+  const viewport = page.locator("#viewport")
+  const before = await cameraTransform(page)
+  const accepted = await viewport.evaluate((element) => {
+    element.hidden = true
+    const events = [
+      new WheelEvent("wheel", { cancelable: true, ctrlKey: true, deltaY: -100 }),
+      new PointerEvent("pointerdown", { cancelable: true, pointerType: "mouse", isPrimary: true }),
+      new KeyboardEvent("keydown", { cancelable: true, key: "+" }),
+    ]
+    const accepted = events.map((event) => element.dispatchEvent(event))
+    element.hidden = false
+    return accepted
+  })
+  expect(accepted).toEqual([true, true, true])
+  expect(await cameraTransform(page)).toBe(before)
+  await viewport.dispatchEvent("wheel", { cancelable: true, ctrlKey: true, deltaY: -100 })
+  expect(await cameraTransform(page)).not.toBe(before)
+})
+
 test("destroy releases active capture and all camera behavior", async ({ page }) => {
   const touch = await openCamera(page)
   await touch("touchStart", [[1, 280, 100]])
