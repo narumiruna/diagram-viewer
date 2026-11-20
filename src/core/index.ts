@@ -18,8 +18,11 @@ export {
 export {
   createDiagramView,
   type DiagramCameraMode,
+  type DiagramKeyboardPan,
   type DiagramPoint,
+  type DiagramRegion,
   type DiagramViewController,
+  type DiagramViewOptions,
   type DiagramViewState,
   maxDiagramScale,
   minDiagramScale,

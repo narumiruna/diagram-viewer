@@ -138,6 +138,20 @@
   will-change: transform;
 }
 
+/* A decorative frame follows the stage without changing the live SVG. */
+.ndv-stage[data-ndv-focus-region]::after {
+  content: "";
+  position: absolute;
+  top: var(--ndv-region-y);
+  left: var(--ndv-region-x);
+  width: var(--ndv-region-width);
+  height: var(--ndv-region-height);
+  box-sizing: border-box;
+  border: 2px solid var(--ndv-focus, #1463d6);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
 .ndv-svg svg {
   display: block;
   /* biome-ignore lint/complexity/noImportantStyles: Override renderer inline sizing. */
@@ -172,5 +186,10 @@
 @media (forced-colors: active) {
   .ndv-control {
     border-color: ButtonText;
+  }
+
+  .ndv-stage[data-ndv-focus-region]::after {
+    border-color: Highlight;
+    border-style: dashed;
   }
 }

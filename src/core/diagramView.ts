@@ -7,7 +7,14 @@ const touchDragThreshold = 6
 const nativeControlSelector =
   'input, select, textarea, button, a[href], label, summary, [contenteditable]:not([contenteditable="false"])'
 
-export type DiagramCameraMode = "overview" | "readable"
+export type DiagramCameraMode = "overview" | "readable" | "focus"
+export type DiagramKeyboardPan = "arrows" | "shift-arrows"
+
+/** Coordinates relative to the top-left of the unscaled stage, in CSS pixels. */
+export interface DiagramRegion extends DiagramPoint {
+  width: number
+  height: number
+}
 
 export interface DiagramViewState {
   cameraMode: DiagramCameraMode
@@ -30,14 +37,20 @@ export interface DiagramViewController {
   refresh(forceCamera?: boolean): void
   reset(): void
   setCameraMode(mode: DiagramCameraMode): void
+  /** Show a new focus region, or drop the region and return to the overview. */
+  setFocusRegion(region?: Readonly<DiagramRegion>): void
   zoomBy(factor: number, clientPoint?: DiagramPoint): void
 }
 
-interface DiagramViewOptions {
+export interface DiagramViewOptions {
+  focusRegion?: Readonly<DiagramRegion>
+  getKeyboardPan?: () => DiagramKeyboardPan | undefined
   isExpanded?: () => boolean
+  isKeyboardEnabled?: () => boolean
   onCameraModeChange?: (mode: DiagramCameraMode) => void
   onCropChange?: (cropped: boolean) => void
   onEscape?: () => boolean
+  onFocusRegionChange?: (hasFocusRegion: boolean) => void
   onScaleChange?: (scale: number, minimumScale: number, maximumScale: number) => void
 }
 
@@ -48,6 +61,30 @@ interface PointerPosition {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
+}
+
+const focusProperties = {
+  x: "--ndv-region-x",
+  y: "--ndv-region-y",
+  width: "--ndv-region-width",
+  height: "--ndv-region-height",
+} as const
+const focusDimensions = Object.keys(focusProperties) as (keyof DiagramRegion)[]
+
+export function sameRegion(a?: Readonly<DiagramRegion>, b?: Readonly<DiagramRegion>): boolean {
+  if (!a || !b) return a === b
+  return focusDimensions.every((dimension) => Object.is(a[dimension], b[dimension]))
+}
+
+function validRegion(region?: Readonly<DiagramRegion>): region is Readonly<DiagramRegion> {
+  return (
+    !!region &&
+    focusDimensions.every((dimension) => Number.isFinite(region[dimension])) &&
+    region.x >= 0 &&
+    region.y >= 0 &&
+    region.width > 0 &&
+    region.height > 0
+  )
 }
 
 function positive(value: number, fallback: number): number {
@@ -105,6 +142,9 @@ export function createDiagramView(
   let resizeFrame = 0
   let previousWidth = 0
   let previousHeight = 0
+  let cameraMode: DiagramCameraMode = "overview"
+  let requestedRegion: DiagramRegion | undefined
+  let activeRegion: DiagramRegion | undefined
 
   const expanded = () => options.isExpanded?.() === true
 
@@ -113,9 +153,7 @@ export function createDiagramView(
     return candidate instanceof SVGSVGElement ? candidate : undefined
   }
 
-  function readNaturalSize(): void {
-    const diagram = svg()
-    if (!diagram) return
+  function readNaturalSize(diagram: SVGSVGElement): void {
     const values = (diagram.getAttribute("viewBox") ?? "")
       .trim()
       .split(/[\s,]+/)
@@ -193,43 +231,53 @@ export function createDiagramView(
     options.onCropChange?.(cropped)
   }
 
-  function showOverview(): void {
-    readNaturalSize()
-    updateInlineHeight()
-    const inset = padding()
-    const fit = Math.min(
-      (viewport.clientWidth - inset.left - inset.right) / state.naturalWidth,
-      (viewport.clientHeight - inset.top - inset.bottom) / state.naturalHeight,
-    )
-    const limited = expanded() ? fit : Math.min(1, fit)
-    state.scale = Math.min(positive(limited, 1), maxDiagramScale)
-    minimumScale = Math.min(minDiagramScale, state.scale)
-    state.cameraMode = "overview"
-    state.userModified = false
-    apply()
-    previousWidth = viewport.clientWidth
-    previousHeight = viewport.clientHeight
-    options.onCameraModeChange?.("overview")
+  function updateFocusFrame(region?: DiagramRegion): void {
+    if (activeRegion === region) return
+    const hadRegion = activeRegion !== undefined
+    activeRegion = region
+    for (const dimension of focusDimensions) {
+      const property = focusProperties[dimension]
+      if (region) stage.style.setProperty(property, `${region[dimension]}px`)
+      else stage.style.removeProperty(property)
+    }
+    stage.toggleAttribute("data-ndv-focus-region", region !== undefined)
+    if (hadRegion !== (region !== undefined)) options.onFocusRegionChange?.(region !== undefined)
   }
 
-  function showReadable(): void {
-    readNaturalSize()
-    updateInlineHeight()
+  function applyCameraMode(): void {
     const inset = padding()
-    state.scale = clamp(
-      Math.max(1, minReadableLabelPixels / labelFontSize()),
-      minDiagramScale,
-      maxDiagramScale,
-    )
-    minimumScale = minDiagramScale
-    state.x = inset.left
-    state.y = inset.top
-    state.cameraMode = "readable"
-    state.userModified = false
+    const width = viewport.clientWidth - inset.left - inset.right
+    const height = viewport.clientHeight - inset.top - inset.bottom
+    const fit = Math.min(width / state.naturalWidth, height / state.naturalHeight)
+    const overview = Math.min(positive(expanded() ? fit : Math.min(1, fit), 1), maxDiagramScale)
+    const region = cameraMode === "focus" ? activeRegion : undefined
+    state.cameraMode = cameraMode === "focus" && !region ? "overview" : cameraMode
+
+    if (state.cameraMode === "readable") {
+      state.scale = clamp(
+        Math.max(1, minReadableLabelPixels / labelFontSize()),
+        minDiagramScale,
+        maxDiagramScale,
+      )
+      minimumScale = minDiagramScale
+      state.x = inset.left
+      state.y = inset.top
+    } else {
+      minimumScale = Math.min(minDiagramScale, overview)
+      state.scale = region
+        ? clamp(Math.min(width / region.width, height / region.height), overview, maxDiagramScale)
+        : overview
+      state.x =
+        inset.left +
+        width / 2 -
+        (region ? region.x + region.width / 2 : state.naturalWidth / 2) * state.scale
+      state.y =
+        inset.top +
+        height / 2 -
+        (region ? region.y + region.height / 2 : state.naturalHeight / 2) * state.scale
+    }
     apply()
-    previousWidth = viewport.clientWidth
-    previousHeight = viewport.clientHeight
-    options.onCameraModeChange?.("readable")
+    options.onCameraModeChange?.(state.cameraMode)
   }
 
   function setScaleAt(next: number, point: DiagramPoint, worldPoint?: DiagramPoint): void {
@@ -265,23 +313,48 @@ export function createDiagramView(
       x: (oldWidth / 2 - state.x) / state.scale,
       y: (oldHeight / 2 - state.y) / state.scale,
     }
-    readNaturalSize()
+    const diagram = svg()
+    if (diagram) readNaturalSize(diagram)
+    const region = requestedRegion
+    const resolved =
+      region &&
+      diagram &&
+      region.x + region.width <= state.naturalWidth &&
+      region.y + region.height <= state.naturalHeight
+        ? region
+        : undefined
+    const focusChanged = resolved !== activeRegion
+    updateFocusFrame(resolved)
+    if (viewport.hidden) return
     updateInlineHeight()
-    if (forceCamera || !state.userModified) {
-      if (state.cameraMode === "overview") showOverview()
-      else showReadable()
+    previousWidth = viewport.clientWidth
+    previousHeight = viewport.clientHeight
+    if (forceCamera || !state.userModified || (focusChanged && cameraMode === "focus")) {
+      state.userModified = false
+      applyCameraMode()
       return
     }
     state.x = viewport.clientWidth / 2 - worldCenter.x * state.scale
     state.y = viewport.clientHeight / 2 - worldCenter.y * state.scale
-    previousWidth = viewport.clientWidth
-    previousHeight = viewport.clientHeight
     apply()
   }
 
   function setCameraMode(mode: DiagramCameraMode): void {
-    if (mode === "overview") showOverview()
-    else showReadable()
+    cameraMode = mode
+    // The requested mode also wins if the update happens while source is visible.
+    state.userModified = false
+    refresh()
+  }
+
+  function setFocusRegion(region?: Readonly<DiagramRegion>): void {
+    const next = validRegion(region) ? region : undefined
+    if (sameRegion(requestedRegion, next)) return
+    requestedRegion = next && { ...next }
+    setCameraMode(next ? "focus" : "overview")
+  }
+
+  function reset(): void {
+    setCameraMode(activeRegion ? "focus" : "readable")
   }
 
   function capture(event: PointerEvent, owner: Element = viewport): void {
@@ -419,20 +492,29 @@ export function createDiagramView(
   }
 
   function onKeyDown(event: KeyboardEvent): void {
-    if (event.key !== "Escape" && isInteractiveTarget(event.target)) return
-    if (event.altKey || event.ctrlKey || event.metaKey) return
+    if (
+      event.defaultPrevented ||
+      event.isComposing ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey
+    )
+      return
+    if (
+      event.key !== "Escape" &&
+      (event.target !== viewport || options.isKeyboardEnabled?.() === false)
+    )
+      return
     switch (event.key) {
       case "ArrowLeft":
-        panBy(40, 0)
-        break
       case "ArrowRight":
-        panBy(-40, 0)
-        break
       case "ArrowUp":
-        panBy(0, 40)
-        break
       case "ArrowDown":
-        panBy(0, -40)
+        if (options.getKeyboardPan?.() === "shift-arrows" && !event.shiftKey) return
+        panBy(
+          event.key === "ArrowLeft" ? 40 : event.key === "ArrowRight" ? -40 : 0,
+          event.key === "ArrowUp" ? 40 : event.key === "ArrowDown" ? -40 : 0,
+        )
         break
       case "+":
       case "=":
@@ -442,16 +524,16 @@ export function createDiagramView(
         zoomBy(0.8)
         break
       case "0":
-        showOverview()
+        setCameraMode("overview")
         break
       case "Escape":
         if (!options.onEscape?.()) return
-        event.stopPropagation()
         break
       default:
         return
     }
     event.preventDefault()
+    event.stopPropagation()
   }
 
   viewport.addEventListener("pointerdown", onPointerDown)
@@ -472,12 +554,14 @@ export function createDiagramView(
         })
       : undefined
   resizeObserver?.observe(viewport)
-  showOverview()
+  if (validRegion(options.focusRegion)) setFocusRegion(options.focusRegion)
+  else refresh()
 
   return {
     destroy() {
       cancelAnimationFrame(resizeFrame)
       resizeObserver?.disconnect()
+      updateFocusFrame()
       pointers.clear()
       mousePointerID = undefined
       mouseLast = undefined
@@ -496,8 +580,9 @@ export function createDiagramView(
     },
     getState: () => state,
     refresh,
-    reset: showReadable,
+    reset,
     setCameraMode,
+    setFocusRegion,
     zoomBy,
   }
 }

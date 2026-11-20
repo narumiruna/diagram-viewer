@@ -1,5 +1,12 @@
 import { createPngExport, downloadDiagram } from "./diagramExport.js"
-import { createDiagramView, maxDiagramScale, minDiagramScale } from "./diagramView.js"
+import {
+  createDiagramView,
+  type DiagramKeyboardPan,
+  type DiagramRegion,
+  maxDiagramScale,
+  minDiagramScale,
+  sameRegion,
+} from "./diagramView.js"
 
 /** Host-owned content and presentation. SVG must already be trusted or sanitized. */
 export interface DiagramOptions {
@@ -8,6 +15,10 @@ export interface DiagramOptions {
   svg?: string
   /** Defaults to true. Signal ready content changes with update or refresh. */
   ready?: boolean
+  /** Focus rectangle in unscaled stage pixels. Omit for a full overview. */
+  focusRegion?: Readonly<DiagramRegion>
+  /** Defaults to plain arrow keys. Use Shift+arrows to leave plain arrows to the host. */
+  keyboardPan?: DiagramKeyboardPan
   refreshing?: boolean
   renderError?: string
   retryRender?: () => void
@@ -37,6 +48,7 @@ export interface DiagramState {
   readonly minimum: number
   readonly maximum: number
   readonly cropped: boolean
+  readonly hasFocusRegion: boolean
   readonly showSource: boolean
   readonly expanded: boolean
   readonly fallback: boolean
@@ -70,6 +82,7 @@ export const initialDiagramState: Readonly<DiagramState> = Object.freeze({
   minimum: minDiagramScale,
   maximum: maxDiagramScale,
   cropped: false,
+  hasFocusRegion: false,
   showSource: false,
   expanded: false,
   fallback: false,
@@ -94,7 +107,10 @@ export function getDiagramAction(
     case "fit":
       return { label: "Fit to screen", disabled: cameraDisabled }
     case "reset":
-      return { label: "Reset zoom", disabled: cameraDisabled }
+      return {
+        label: state.hasFocusRegion ? "Reset to slide focus" : "Reset zoom",
+        disabled: cameraDisabled,
+      }
     case "fullscreen":
       return {
         label: state.expanded ? "Exit fullscreen" : "Fullscreen",
@@ -278,9 +294,13 @@ export function createDiagramController(
   }
 
   const camera = createDiagramView(viewport, stage, {
+    focusRegion: options.focusRegion,
+    getKeyboardPan: () => options.keyboardPan,
+    isKeyboardEnabled: () => options.ready !== false && !state.showSource,
     isExpanded: () => document.fullscreenElement === root || state.fallback,
     onCropChange: (cropped) => publish({ cropped }),
     onEscape: closeFallback,
+    onFocusRegionChange: (hasFocusRegion) => publish({ hasFocusRegion }),
     onScaleChange: (scale, minimum, maximum) => publish({ scale, minimum, maximum }),
   })
 
@@ -417,9 +437,12 @@ export function createDiagramController(
     update(next) {
       if (destroyed) return
       const keys = Object.keys({ ...options, ...next }) as (keyof DiagramOptions)[]
-      if (keys.every((key) => options[key] === next[key])) return
+      const focusChanged = !sameRegion(options.focusRegion, next.focusRegion)
+      if (!focusChanged && keys.every((key) => key === "focusRegion" || options[key] === next[key]))
+        return
       const changed = options.svg !== next.svg || options.ready !== next.ready
       options = { ...next }
+      if (focusChanged) camera.setFocusRegion(options.focusRegion)
       publish({}, true)
       if (changed) nextFrame(refresh)
     },
