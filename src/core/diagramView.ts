@@ -43,15 +43,23 @@ export interface DiagramViewController {
 }
 
 export interface DiagramViewOptions {
+  /** Limits automatic focus zoom, not manual zoom. Defaults to the manual maximum (4). */
+  focusMaxScale?: number
   focusRegion?: Readonly<DiagramRegion>
   getKeyboardPan?: () => DiagramKeyboardPan | undefined
   isExpanded?: () => boolean
+  /** Returns false while host content is loading or unavailable. Hidden views always ignore input. */
+  isInteractionEnabled?: () => boolean
   isKeyboardEnabled?: () => boolean
+  /** Defaults to true. Set to false if the host owns the viewport height. */
+  manageInlineHeight?: boolean
   onCameraModeChange?: (mode: DiagramCameraMode) => void
   onCropChange?: (cropped: boolean) => void
   onEscape?: () => boolean
   onFocusRegionChange?: (hasFocusRegion: boolean) => void
   onScaleChange?: (scale: number, minimumScale: number, maximumScale: number) => void
+  /** Defaults to readable labels. Native centers at 100% and allows zooming back out to fit. */
+  resetMode?: "readable" | "native"
 }
 
 interface PointerPosition {
@@ -115,6 +123,14 @@ export function createDiagramView(
   stage: HTMLElement,
   options: DiagramViewOptions = {},
 ): DiagramViewController {
+  return createDiagramViewWithGestureControl(viewport, stage, options)
+}
+
+export function createDiagramViewWithGestureControl(
+  viewport: HTMLElement,
+  stage: HTMLElement,
+  options: DiagramViewOptions,
+): DiagramViewController & { stopGestures(): void } {
   const state: DiagramViewState = {
     cameraMode: "overview",
     naturalHeight: 1,
@@ -145,8 +161,14 @@ export function createDiagramView(
   let cameraMode: DiagramCameraMode = "overview"
   let requestedRegion: DiagramRegion | undefined
   let activeRegion: DiagramRegion | undefined
+  let destroyed = false
 
   const expanded = () => options.isExpanded?.() === true
+  const nativeReset = options.resetMode === "native"
+  const focusMaxScale = Math.min(
+    positive(options.focusMaxScale ?? 0, maxDiagramScale),
+    maxDiagramScale,
+  )
 
   function svg(): SVGSVGElement | undefined {
     const candidate = stage.querySelector("svg")
@@ -180,7 +202,34 @@ export function createDiagramView(
     }
   }
 
+  function isVisible(): boolean {
+    if (
+      destroyed ||
+      !viewport.isConnected ||
+      !stage.isConnected ||
+      viewport.hidden ||
+      stage.hidden
+    ) {
+      return false
+    }
+    const visibility = getComputedStyle(stage).visibility
+    return visibility !== "hidden" && visibility !== "collapse"
+  }
+
+  function hasSpace(): boolean {
+    const inset = padding()
+    return (
+      viewport.clientWidth > inset.left + inset.right &&
+      viewport.clientHeight > inset.top + inset.bottom
+    )
+  }
+
+  function acceptsInput(): boolean {
+    return isVisible() && hasSpace() && options.isInteractionEnabled?.() !== false
+  }
+
   function updateInlineHeight(): void {
+    if (options.manageInlineHeight === false) return
     if (expanded()) {
       viewport.style.removeProperty("height")
       return
@@ -244,16 +293,21 @@ export function createDiagramView(
     if (hadRegion !== (region !== undefined)) options.onFocusRegionChange?.(region !== undefined)
   }
 
-  function applyCameraMode(): void {
+  function cameraGeometry() {
     const inset = padding()
     const width = viewport.clientWidth - inset.left - inset.right
     const height = viewport.clientHeight - inset.top - inset.bottom
     const fit = Math.min(width / state.naturalWidth, height / state.naturalHeight)
     const overview = Math.min(positive(expanded() ? fit : Math.min(1, fit), 1), maxDiagramScale)
+    return { inset, width, height, overview }
+  }
+
+  function applyCameraMode(): void {
+    const { inset, width, height, overview } = cameraGeometry()
     const region = cameraMode === "focus" ? activeRegion : undefined
     state.cameraMode = cameraMode === "focus" && !region ? "overview" : cameraMode
 
-    if (state.cameraMode === "readable") {
+    if (state.cameraMode === "readable" && !nativeReset) {
       state.scale = clamp(
         Math.max(1, minReadableLabelPixels / labelFontSize()),
         minDiagramScale,
@@ -264,9 +318,13 @@ export function createDiagramView(
       state.y = inset.top
     } else {
       minimumScale = Math.min(minDiagramScale, overview)
-      state.scale = region
-        ? clamp(Math.min(width / region.width, height / region.height), overview, maxDiagramScale)
-        : overview
+      state.scale = state.cameraMode === "readable" ? 1 : overview
+      if (region) {
+        state.scale = Math.max(
+          overview,
+          Math.min(width / region.width, height / region.height, focusMaxScale),
+        )
+      }
       state.x =
         inset.left +
         width / 2 -
@@ -293,6 +351,7 @@ export function createDiagramView(
   }
 
   function zoomBy(factor: number, clientPoint?: DiagramPoint): void {
+    if (!(Number.isFinite(factor) && factor > 0) || !acceptsInput()) return
     const point = clientPoint
       ? localPoint(viewport, clientPoint)
       : { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 }
@@ -307,6 +366,7 @@ export function createDiagramView(
   }
 
   function refresh(forceCamera = false): void {
+    if (destroyed) return
     const oldWidth = previousWidth || viewport.clientWidth
     const oldHeight = previousHeight || viewport.clientHeight
     const worldCenter = {
@@ -325,8 +385,14 @@ export function createDiagramView(
         : undefined
     if (resolved !== activeRegion && cameraMode === "focus") state.userModified = false
     updateFocusFrame(resolved)
-    if (viewport.hidden) return
+    if (!isVisible()) {
+      stopGestures()
+      return
+    }
     updateInlineHeight()
+    const usable = hasSpace()
+    if (!usable || options.isInteractionEnabled?.() === false || forceCamera) stopGestures()
+    if (!usable) return
     previousWidth = viewport.clientWidth
     previousHeight = viewport.clientHeight
     if (forceCamera || !state.userModified) {
@@ -334,12 +400,18 @@ export function createDiagramView(
       applyCameraMode()
       return
     }
+    if (nativeReset) {
+      minimumScale = Math.min(minDiagramScale, cameraGeometry().overview)
+      state.scale = clamp(state.scale, minimumScale, maxDiagramScale)
+    }
     state.x = viewport.clientWidth / 2 - worldCenter.x * state.scale
     state.y = viewport.clientHeight / 2 - worldCenter.y * state.scale
     apply()
   }
 
   function setCameraMode(mode: DiagramCameraMode): void {
+    if (destroyed) return
+    stopGestures()
     cameraMode = mode
     // The requested mode also wins if the update happens while source is visible.
     state.userModified = false
@@ -347,6 +419,7 @@ export function createDiagramView(
   }
 
   function setFocusRegion(region?: Readonly<DiagramRegion>): void {
+    if (destroyed) return
     const next = validRegion(region) ? region : undefined
     if (sameRegion(requestedRegion, next)) return
     requestedRegion = next && { ...next }
@@ -354,7 +427,7 @@ export function createDiagramView(
   }
 
   function reset(): void {
-    setCameraMode(activeRegion ? "focus" : "readable")
+    if (acceptsInput()) setCameraMode(activeRegion ? "focus" : "readable")
   }
 
   function capture(event: PointerEvent, owner: Element = viewport): void {
@@ -376,6 +449,16 @@ export function createDiagramView(
     }
   }
 
+  function stopGestures(): void {
+    pointers.clear()
+    mousePointerID = undefined
+    mouseLast = undefined
+    touchLast = undefined
+    pinch = undefined
+    pendingTouchClicks.clear()
+    for (const pointerID of captures.keys()) releaseCapture(pointerID)
+  }
+
   function isInteractiveTarget(target: EventTarget | null, touchNode?: SVGElement): boolean {
     if (!(target instanceof Element)) return false
     let control = target.closest(`${nativeControlSelector}, [tabindex]`)
@@ -387,6 +470,7 @@ export function createDiagramView(
   }
 
   function onPointerDown(event: PointerEvent): void {
+    if (event.defaultPrevented || !acceptsInput()) return
     if (pointers.size === 0) pendingTouchClicks.clear()
     const candidate =
       event.pointerType === "touch" && event.target instanceof Element
@@ -421,15 +505,21 @@ export function createDiagramView(
       }
       return
     }
-    if (event.button !== 0) return
+    if (event.button !== 0 || event.isPrimary === false || mousePointerID !== undefined) return
     mousePointerID = event.pointerId
     mouseLast = { x: event.clientX, y: event.clientY }
     capture(event)
+    viewport.focus({ preventScroll: true })
     event.preventDefault()
   }
 
   function onPointerMove(event: PointerEvent): void {
     const pointer = pointers.get(event.pointerId)
+    if (!pointer && event.pointerId !== mousePointerID) return
+    if (!acceptsInput()) {
+      stopGestures()
+      return
+    }
     if (event.pointerType === "touch" && pointer) {
       if (
         Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) >
@@ -473,7 +563,7 @@ export function createDiagramView(
 
   function onClick(event: MouseEvent): void {
     // Keyboard, assistive technology and programmatic activation are not drag clicks.
-    if (event.detail === 0 || pendingTouchClicks.size === 0) return
+    if (event.detail === 0 || pendingTouchClicks.size === 0 || !acceptsInput()) return
     if ("pointerId" in event) {
       if (!pendingTouchClicks.delete(event.pointerId as number)) return
     } else {
@@ -485,8 +575,15 @@ export function createDiagramView(
   }
 
   function onWheel(event: WheelEvent): void {
-    if (isInteractiveTarget(event.target)) return
-    if (!event.ctrlKey && !event.metaKey) return
+    if (
+      event.defaultPrevented ||
+      (!event.ctrlKey && !event.metaKey) ||
+      !Number.isFinite(event.deltaY) ||
+      event.deltaY === 0 ||
+      isInteractiveTarget(event.target) ||
+      !acceptsInput()
+    )
+      return
     event.preventDefault()
     zoomBy(event.deltaY < 0 ? 1.1 : 0.9, { x: event.clientX, y: event.clientY })
   }
@@ -502,7 +599,7 @@ export function createDiagramView(
       return
     if (
       event.key !== "Escape" &&
-      (event.target !== viewport || options.isKeyboardEnabled?.() === false)
+      (event.target !== viewport || options.isKeyboardEnabled?.() === false || !acceptsInput())
     )
       return
     switch (event.key) {
@@ -559,16 +656,12 @@ export function createDiagramView(
 
   return {
     destroy() {
+      if (destroyed) return
+      destroyed = true
       cancelAnimationFrame(resizeFrame)
       resizeObserver?.disconnect()
       updateFocusFrame()
-      pointers.clear()
-      mousePointerID = undefined
-      mouseLast = undefined
-      touchLast = undefined
-      pinch = undefined
-      pendingTouchClicks.clear()
-      for (const pointerID of captures.keys()) releaseCapture(pointerID)
+      stopGestures()
       viewport.removeEventListener("pointerdown", onPointerDown)
       ownerDocument.removeEventListener("pointermove", onPointerMove)
       ownerDocument.removeEventListener("pointerup", stopPointer)
@@ -583,6 +676,7 @@ export function createDiagramView(
     reset,
     setCameraMode,
     setFocusRegion,
+    stopGestures,
     zoomBy,
   }
 }

@@ -1,6 +1,20 @@
 import "@testing-library/jest-dom/vitest"
 import { cleanup } from "@testing-library/react"
-import { afterEach, vi } from "vitest"
+import { afterEach, beforeEach, vi } from "vitest"
+
+beforeEach(() => {
+  // jsdom does not lay out the React viewport. Supply the visible content box.
+  for (const [dimension, size] of [
+    ["clientWidth", 500],
+    ["clientHeight", 300],
+  ] as const) {
+    vi.spyOn(HTMLElement.prototype, dimension, "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.matches(".ndv-viewport:not([hidden])") ? size : 0
+    })
+  }
+})
 
 afterEach(() => {
   cleanup()

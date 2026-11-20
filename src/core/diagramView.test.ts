@@ -509,6 +509,77 @@ describe("diagram view", () => {
     controller.destroy()
   })
 
+  it("uses the current fitted scale as the native reset zoom floor", () => {
+    const { stage, viewport } = fixture()
+    stage.innerHTML = '<svg viewBox="0 0 5000 500"><text style="font-size: 8px">Wide</text></svg>'
+    const onScaleChange = vi.fn()
+    const controller = createDiagramView(viewport, stage, { resetMode: "native", onScaleChange })
+    controller.reset()
+    expect(controller.getState()).toMatchObject({ scale: 1, x: -2250, y: -100 })
+    controller.zoomBy(0.01)
+    expect(onScaleChange).toHaveBeenLastCalledWith(0.1, 0.1, maxDiagramScale)
+    Object.defineProperty(viewport, "clientWidth", { value: 600 })
+    controller.refresh()
+    expect(onScaleChange).toHaveBeenLastCalledWith(0.12, 0.12, maxDiagramScale)
+    controller.destroy()
+  })
+
+  it("leaves host-managed height alone and fits against the supplied dimensions", () => {
+    const { stage, viewport } = fixture()
+    viewport.style.height = "200px"
+    Object.defineProperty(viewport, "clientHeight", { value: 200 })
+    let expanded = false
+    const controller = createDiagramView(viewport, stage, {
+      manageInlineHeight: false,
+      isExpanded: () => expanded,
+    })
+    expect(viewport.style.height).toBe("200px")
+    expect(controller.getState().scale).toBe(0.4)
+    expanded = true
+    controller.refresh()
+    expect(viewport.style.height).toBe("200px")
+    controller.destroy()
+  })
+
+  it("caps automatic focus scale without capping manual zoom", () => {
+    const { stage, viewport } = fixture()
+    const controller = createDiagramView(viewport, stage, { focusMaxScale: 2 })
+    controller.setFocusRegion({ x: 300, y: 200, width: 50, height: 50 })
+    expect(controller.getState().scale).toBe(2)
+    controller.zoomBy(2)
+    expect(controller.getState().scale).toBe(maxDiagramScale)
+    controller.reset()
+    expect(controller.getState().scale).toBe(2)
+    controller.destroy()
+  })
+
+  it("releases a captured drag when the host suspends input and preserves zoom", () => {
+    const { stage, viewport } = fixture()
+    let enabled = true
+    const release = vi.spyOn(viewport, "releasePointerCapture")
+    const controller = createDiagramView(viewport, stage, {
+      isInteractionEnabled: () => enabled,
+    })
+    controller.zoomBy(2)
+    viewport.dispatchEvent(pointer("pointerdown", 7, 250, 150, "mouse"))
+    const before = stage.style.transform
+    enabled = false
+    controller.refresh()
+    expect(release).toHaveBeenCalledWith(7)
+    const move = pointer("pointermove", 7, 150, 150, "mouse")
+    viewport.dispatchEvent(move)
+    const wheel = new WheelEvent("wheel", { cancelable: true, ctrlKey: true, deltaY: -1 })
+    viewport.dispatchEvent(wheel)
+    const key = new KeyboardEvent("keydown", { cancelable: true, key: "+" })
+    viewport.dispatchEvent(key)
+    for (const event of [move, wheel, key]) expect(event.defaultPrevented).toBe(false)
+    expect(stage.style.transform).toBe(before)
+    enabled = true
+    controller.refresh()
+    expect(stage.style.transform).toBe(before)
+    controller.destroy()
+  })
+
   it("bounds zoom and preserves a user-modified scale while refreshing", () => {
     const { stage, viewport } = fixture()
     const controller = createDiagramView(viewport, stage)

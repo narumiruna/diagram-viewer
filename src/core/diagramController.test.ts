@@ -201,6 +201,53 @@ describe("diagram controller", () => {
     expect(controller.getAction("fit").disabled).toBe(false)
   })
 
+  it.each([false, true])(
+    "releases an active drag at readiness loss (SVG missing: %s)",
+    (missing) => {
+      const options = { source: "source", svg: "trusted SVG" }
+      const { controller, stage, viewport } = fixture(options)
+      const capture = vi.spyOn(viewport, "setPointerCapture")
+      const release = vi.spyOn(viewport, "releasePointerCapture")
+      controller.run("zoomIn")
+      const transform = stage.style.transform
+      viewport.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 7,
+          pointerType: "mouse",
+          isPrimary: true,
+          clientX: 250,
+          clientY: 150,
+        }),
+      )
+      expect(capture).toHaveBeenCalledWith(7)
+
+      stage.innerHTML = missing ? "" : '<svg viewBox="0 0 250 100"></svg>'
+      const query = vi.spyOn(stage, "querySelector")
+      controller.update({ ...options, ready: false })
+      expect(release).toHaveBeenCalledExactlyOnceWith(7)
+      flushFrames()
+      expect(query).not.toHaveBeenCalled()
+      expect(stage.style.width).toBe("1000px")
+      expect(stage.style.transform).toBe(transform)
+
+      stage.innerHTML = '<svg viewBox="0 0 1000 500"></svg>'
+      controller.update({ ...options, ready: true })
+      flushFrames()
+      const move = new PointerEvent("pointermove", {
+        cancelable: true,
+        pointerId: 7,
+        pointerType: "mouse",
+        clientX: 200,
+        clientY: 150,
+      })
+      document.dispatchEvent(move)
+      expect(move.defaultPrevented).toBe(false)
+      expect(stage.style.transform).toBe(transform)
+    },
+  )
+
   it("refreshes host-owned content without replacing chart children", () => {
     const { controller, stage } = fixture()
     const chart = stage.firstElementChild

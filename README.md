@@ -164,12 +164,12 @@ export function HostChart({ source }: { source: string }) {
 }
 ```
 
-`ready: false` disables camera/export actions but keeps source access. Set it to
-true after rendering. For replacements while `ready` remains true, change
-`contentVersion` after the DOM update; this refreshes the camera. Changing `svg`
-also refreshes the camera. Source mode and fullscreen retain the same SVG and
-host mount. `refreshing`, `renderError`, and `retryRender` are host-owned render
-state; retry execution is not a renderer plugin system.
+`ready: false` ends active camera gestures and disables camera/export actions
+but keeps source access. Set it to true after rendering. For replacements while
+`ready` remains true, change `contentVersion` after the DOM update; this refreshes
+the camera. Changing `svg` also refreshes the camera. Source mode and fullscreen
+retain the same SVG and host mount. `refreshing`, `renderError`, and `retryRender`
+are host-owned render state; retry execution is not a renderer plugin system.
 
 When keeping a previous successful SVG during refresh, keep its export
 `background` paired with it until a new render succeeds. `background` affects
@@ -260,8 +260,22 @@ camera.destroy()
   manage touch CSS before gestures begin: `touch-action: pan-y` inline for page
   scrolling and `touch-action: none` only on the expanded two-dimensional camera.
   Inline touch does not move the camera, including touches starting on nodes.
-- The readable camera measures SVG text and HTML span/paragraph labels inside
-  `foreignObject`, so small HTML-only labels receive the same readable scaling.
+- By default, the camera sets the inline viewport height. Set
+  `manageInlineHeight: false` if the host styles that height itself. The camera
+  leaves the inline height untouched, including when expanded, and fits to the
+  measured space inside the viewport padding.
+- Without a focus region, reset defaults to the readable camera. It measures
+  SVG text and HTML span/paragraph labels inside `foreignObject`. Set
+  `resetMode: "native"` to reset to a centered 100% instead; in native mode
+  the zoom floor is the smaller of 25% and the fitted overview scale, including
+  after a resize. Set `focusMaxScale` to cap automatic focus zoom (default 4).
+  A focus region never zooms below the overview scale, and manual zoom still
+  goes up to 400%.
+- Hidden, detached, and zero-space viewports do not handle camera input. Use
+  `isInteractionEnabled: () => ready` if the host needs to suspend camera input
+  while it renders or replaces content. Call `camera.refresh()` after a host
+  state change to release active pointer capture and apply the current view
+  when it becomes visible again. The Escape hook can still close fullscreen.
 - The host retains activation, accessible names, keyboard handlers, and focus
   styles. The camera does not install node actions or change focusability.
 - `destroy()` removes camera listeners and releases active pointer captures. The

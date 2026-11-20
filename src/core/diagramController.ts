@@ -1,6 +1,6 @@
 import { createPngExport, downloadDiagram } from "./diagramExport.js"
 import {
-  createDiagramView,
+  createDiagramViewWithGestureControl,
   type DiagramKeyboardPan,
   type DiagramRegion,
   maxDiagramScale,
@@ -297,10 +297,10 @@ export function createDiagramController(
     camera.refresh()
   }
 
-  const camera = createDiagramView(viewport, stage, {
+  const camera = createDiagramViewWithGestureControl(viewport, stage, {
     focusRegion: options.focusRegion,
     getKeyboardPan: () => options.keyboardPan,
-    isKeyboardEnabled: () => options.ready !== false && !state.showSource,
+    isInteractionEnabled: () => options.ready !== false && !state.showSource,
     isExpanded: () => document.fullscreenElement === root || state.fallback,
     onCropChange: (cropped) => publish({ cropped }),
     onEscape: closeFallback,
@@ -444,8 +444,10 @@ export function createDiagramController(
       const focusChanged = !sameRegion(options.focusRegion, next.focusRegion)
       if (!focusChanged && keys.every((key) => key === "focusRegion" || options[key] === next[key]))
         return
-      const changed = options.svg !== next.svg || options.ready !== next.ready
+      const readinessChanged = options.ready !== next.ready
+      const changed = options.svg !== next.svg || readinessChanged
       options = snapshotOptions(next)
+      if (readinessChanged && options.ready === false) camera.stopGestures()
       if (focusChanged) camera.setFocusRegion(options.focusRegion)
       publish({}, true)
       if (changed) nextFrame(refresh)
