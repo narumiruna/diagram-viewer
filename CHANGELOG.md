@@ -1,5 +1,15 @@
 # @narumitw/diagram-viewer
 
+## 0.4.0
+
+### Minor Changes
+
+- 9a77a76: Let hosts keep their own diagram height, reset to a centered native scale, and cap automatic focus zoom. Hidden or suspended cameras end active gestures and ignore zoom and pan input without losing their view.
+
+### Patch Changes
+
+- e9d26bf: Stop active drags when opening source view. Ignore camera input when CSS hides the diagram stage, even if the viewport remains visible.
+
 ## 0.3.0
 
 ### Minor Changes
