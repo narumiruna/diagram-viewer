@@ -1,56 +1,283 @@
-# TypeScript Template
+# @narumitw/diagram-viewer
 
-## Human workflow
+React diagram frame, composable controls, and browser-only core. It has no
+Mermaid, Vega, Radix, or Morsel runtime dependency. Rendering stays in the host.
+The verified React and React DOM version is **19.3.1**. License: [MIT](LICENSE).
 
-Install [prek](https://prek.j178.dev/installation/), then install dependencies and enable the Git hooks. prek manages the Biome and zizmor hook environments:
+## Install
 
 ```sh
-npm install
-prek install
-npm run build
-npm start
+npm install @narumitw/diagram-viewer
 ```
 
-For an existing Husky checkout, run `git config --local --unset core.hooksPath` before `prek install`.
+The package is public on npm. The verified React and React DOM version is
+19.3.1. The host still owns rendering and SVG sanitation.
 
-## Automation
+## Use the React viewer
+
+Import the stylesheet explicitly. Supply trusted or sanitized SVG, not arbitrary
+author HTML:
+
+```tsx
+import { DiagramViewer } from "@narumitw/diagram-viewer"
+import "@narumitw/diagram-viewer/styles.css"
+
+const svg = '<svg viewBox="0 0 100 50"><text x="5" y="20">Example</text></svg>'
+
+export function Example() {
+  return (
+    <DiagramViewer
+      source="graph TD; A-->B"
+      svg={svg}
+      graphicName="Example diagram"
+      filename="example"
+      background="#ffffff"
+    />
+  )
+}
+```
+
+The default toolbar order is zoom out, zoom percentage, zoom in, fit, reset,
+fullscreen, source toggle, copy source, SVG download, and PNG download. A retry
+button appears only when both `renderError` and `retryRender` are supplied.
+
+## Compose controls
+
+Select and order actions through children, not a configuration array. This
+example omits the download actions, replaces a built-in icon, and uses an app
+button with the same action/state rules:
+
+```tsx
+import {
+  DiagramActionButton, DiagramRoot, DiagramSource, DiagramStatus,
+  DiagramToolbar, DiagramViewport, DiagramZoom, useDiagramAction,
+} from "@narumitw/diagram-viewer"
+
+function AppZoomButton() {
+  const binding = useDiagramAction("zoomIn")
+  return <button {...binding} className="app-zoom"><span aria-hidden="true">+</span></button>
+}
+
+export function Composed({ source, svg }: { source: string; svg: string }) {
+  return (
+    <DiagramRoot source={source} svg={svg}>
+      <DiagramToolbar>
+        <DiagramActionButton action="source">Source</DiagramActionButton>
+        <AppZoomButton />
+        <DiagramZoom />
+        <button type="button" onClick={() => console.log("app action")}>App action</button>
+      </DiagramToolbar>
+      <DiagramViewport />
+      <DiagramSource />
+      <DiagramStatus />
+    </DiagramRoot>
+  )
+}
+```
+
+Keep exactly one viewport and source view mounted in each root. Include
+`DiagramStatus` for polite action feedback and optionally `DiagramPanHint` for
+cropping instructions. `DiagramDefaultToolbar` can be used in a composed root.
+`DiagramToolbar` is a native fieldset, not an ARIA toolbar: Tab follows DOM order,
+including custom controls. Arrow keys are camera shortcuts only on the viewport,
+not on toolbar controls, editable elements, source, or live chart inputs.
+
+`useDiagramAction(action)` returns native button props: `type`, `onClick`,
+`disabled`, accessible name, busy state, and applicable toggle/control state.
+Spread them onto a native button; do not replace its handler or state. A custom
+visible label must also set a matching accessible name. `DiagramActionButton`
+accepts children, an `aria-label`, a scoped class, and button presentation props.
+Do not replace its built-in handler. Actions are:
+
+```text
+zoomOut zoomIn fit reset fullscreen source copy svg png retry
+```
+
+`useDiagramState()` exposes an immutable snapshot with exact scale bounds,
+cropping, source visibility, fullscreen/fallback state, async action flags, and
+status. It observes the same core controller used by all buttons. Zoom labels
+are rounded for display; disabled bounds use the exact values.
+
+## Host-owned chart mount
+
+Use `hostManaged` when an imperative renderer owns the children. React never
+updates those children. The host must finalize its renderer and remove its own
+mount during cleanup:
+
+```tsx
+import { useEffect, useRef, useState } from "react"
+import { DiagramViewer } from "@narumitw/diagram-viewer"
+
+export function HostChart({ source }: { source: string }) {
+  const stage = useRef<HTMLDivElement>(null)
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    const target = stage.current
+    if (!target) return
+    setReady(false)
+    const mount = document.createElement("div")
+    target.append(mount)
+    // Replace with your local renderer. Never insert unsanitized author HTML.
+    mount.innerHTML = '<svg viewBox="0 0 100 50"><text y="20">Chart</text></svg>'
+    setReady(true)
+    return () => mount.remove() // Also finalize your renderer here.
+  }, [source])
+  return <DiagramViewer source={source} hostManaged stageRef={stage} ready={ready} />
+}
+```
+
+`ready: false` disables camera/export actions but keeps source access. Set it to
+true after rendering. For replacements while `ready` remains true, change
+`contentVersion` after the DOM update; this refreshes the camera. Changing `svg`
+also refreshes the camera. Source mode and fullscreen retain the same SVG and
+host mount. `refreshing`, `renderError`, and `retryRender` are host-owned render
+state; retry execution is not a renderer plugin system.
+
+When keeping a previous successful SVG during refresh, keep its export
+`background` paired with it until a new render succeeds. `background` affects
+PNG export, not CSS. `filename`, `graphicName`, `typeLabel` (such as `chart`),
+`stageClassName`, and `className` let the host supply wording and presentation.
+
+## Styles and accessibility
+
+All default CSS is scoped to `ndv-` classes. Root CSS variables are
+`--ndv-background`, `--ndv-foreground`, `--ndv-border`, `--ndv-control`,
+`--ndv-radius`, and `--ndv-focus`. Set them on the root with `style`, or override
+them in a stylesheet loaded after the package CSS. Choose foreground/background
+pairs with sufficient contrast. No theme provider is needed.
+
+Buttons have accessible names, visible focus, 44-pixel default targets, and
+keyboard/pointer tooltips inside the viewer, including fullscreen. Source is a
+named, keyboard-scrollable text region. Copy and export results use polite
+status feedback. Inline touch scrolls the page; expanded touch pans/pinches.
+Fit selects an overview; reset selects readable labels and can crop the image.
+
+Fullscreen keeps the live DOM node. If the native API fails, the existing
+in-place fallback isolates background siblings with `inert`, locks scroll
+containers, and restores each affected inline axis declaration and its priority
+on exit or unmount. It also returns focus to the opener. Escape and the fullscreen
+button close fallback mode. A failed or late native request cannot reopen the
+fallback after destruction.
+
+## Framework-independent core
+
+```ts
+import { createDiagramController } from "@narumitw/diagram-viewer/core"
+
+const controller = createDiagramController(
+  { root, viewport, stage }, // mounted host DOM elements
+  { source: "graph TD; A-->B", background: "#ffffff", filename: "diagram" },
+)
+const unsubscribe = controller.subscribe(() => console.log(controller.getState()))
+controller.run("fit")
+controller.update({ source: "new source", ready: true }) // full option replacement
+controller.refresh() // after imperative stage changes
+unsubscribe()
+controller.destroy() // on unmount; releases listeners, gestures, and fullscreen
+```
+
+The core has no React or renderer imports and no import-time browser access. It
+can be imported in Node.js; creating an instance, exports, clipboard, and
+fullscreen require mounted browser DOM and supported browser APIs. The core
+never populates the stage: the host owns its content. Use `getAction(action)`
+for framework-independent accessible names and exact disabled/busy/toggle state.
+Camera primitives, `createPngExport`, `serializeDiagramSvg`, and
+`downloadDiagram` are also exported from `/core`. SVG serialization and PNG
+helpers accept an explicit background color, defaulting to white.
+
+### Host-owned selectable nodes and camera
+
+Use `createDiagramView` when the host already owns its toolbar, fullscreen, and
+SVG lifecycle. The primitive does not require React or the package stylesheet:
+
+```ts
+import { createDiagramView } from "@narumitw/diagram-viewer/core"
+
+// The host selects which SVG nodes are actions and supplies their accessible
+// names, role, tabindex, click handler, and Enter/Space activation handlers.
+node.setAttribute("data-diagram-node", "")
+const camera = createDiagramView(viewport, stage, {
+  isExpanded: () => hostExpanded,
+})
+// After host-rendered content or expansion changes:
+camera.refresh()
+// On unmount, before removing the host DOM:
+camera.destroy()
+```
+
+- Set `data-diagram-node` only on selectable SVG nodes that should also start
+  touch pan/pinch in expanded mode. The attribute value is not significant.
+  - A marked node can keep `role="button"` and `tabindex="0"`. A tap still
+    activates it. A completed touch drag beyond 6 CSS pixels suppresses that
+    gesture's click, including clicks retargeted by pointer capture.
+  - Cancellation or lost pointer capture ends tracking. The next tap works.
+    Keyboard, assistive-technology, and programmatic clicks with `detail: 0`
+    remain available after a drag.
+  - Native controls, links, labels, summaries, editable descendants, and nested
+    unmarked `[tabindex]` controls keep their own gestures. Marking a native
+    control does not opt it in. Unmarked controls keep their existing behavior.
+  - The marker does not change mouse, pen, wheel, or keyboard control isolation.
+- The host must set `transform-origin: 0 0` on the stage, clip the viewport, and
+  manage touch CSS before gestures begin: `touch-action: pan-y` inline for page
+  scrolling and `touch-action: none` only on the expanded two-dimensional camera.
+  Inline touch does not move the camera, including touches starting on nodes.
+- The readable camera measures SVG text and HTML span/paragraph labels inside
+  `foreignObject`, so small HTML-only labels receive the same readable scaling.
+- The host retains activation, accessible names, keyboard handlers, and focus
+  styles. The camera does not install node actions or change focusability.
+- `destroy()` removes camera listeners and releases active pointer captures. The
+  host must also remove its own node handlers and finalize its renderer.
+
+## Trust and limits
+
+This package is **not an untrusted HTML renderer**. Sanitize SVG before passing
+`svg`. Keep resource policies, source limits, lazy rendering, renderer queues,
+stale-result handling, and renderer finalization in the host. Source is text,
+never HTML. The package loads no remote renderer, CDN, font, or resource.
+
+SVG download uses the rendered markup directly. PNG separately serializes a
+clone with natural dimensions and background; it does not alter the live SVG.
+PNG limits are 8,192 pixels per dimension, 16 million pixels, and 16 MiB of
+serialized SVG. Decode/encoding failures produce action feedback.
+
+## Build and test
+
+Run these commands from the repository root. Use Node.js 24.15 or later in the
+24.x series, or Node.js 26 or later, with npm 11 or later.
 
 ```sh
+npm ci
+npx playwright install chromium
 npm run ci
+npm run test:browser
 ```
 
-The CI command runs Biome, Vitest, and the TypeScript build.
+`npm run ci` lints, typechecks, builds, runs unit tests, and tests the npm tarball
+in a temporary app. The tarball test checks the package contents, imports the core
+without React or a DOM, typechecks consumer examples, builds a Vite app, and
+exercises it in Chromium. It does not publish to npm. Run
+`npm run test:package` to repeat the tarball test after `npm run build`.
 
-[`prek.toml`](prek.toml) uses the official [Biome hooks](https://github.com/biomejs/pre-commit) to format, organize imports, lint, and apply safe fixes to staged files before each commit. It also uses the official [zizmor hook](https://github.com/zizmorcore/zizmor-pre-commit) with `--pedantic` to audit supported staged YAML files. If a hook changes files, review and stage the changes before retrying the commit.
+Playwright tests use Wayland on WSL. The automated browser checks cover desktop
+Chromium, not other browsers, physical touch devices, or screen readers.
+Playwright output under `test-results/` is ignored by Git.
 
-Run all hooks manually:
+To build and pack without publishing, run `npm pack --pack-destination /tmp`.
+To enable the Biome and zizmor Git hooks, install
+[prek](https://prek.j178.dev/installation/) and run `prek install`.
 
-```sh
-prek run --all-files
-```
+## Releases
 
-Keep the Biome hook revision aligned with `@biomejs/biome` in `package.json` and the schema version in `biome.json`. When updating Biome, migrate its configuration with `npm exec -- biome migrate --write`.
+Run `npm run changeset` and commit the resulting file with each releasable
+change. Use `patch` for fixes, `minor` for features, and `major` for breaking
+changes. Run `npm run changeset -- status` to inspect pending changesets.
 
-GitHub Actions use commit-pinned actions and job-scoped permissions. CI cancels superseded runs. Dependabot waits at least seven days before proposing new dependency versions; security updates are not delayed.
+When changesets reach `main`, the [release workflow](.github/workflows/release.yml)
+opens or updates a pull request with the new version, changelog, and npm lockfile.
+Merging that pull request publishes the new version to npm and creates a Git tag
+and a GitHub release.
 
-Audit the GitHub Actions and Dependabot configuration:
-
-```sh
-prek run zizmor --all-files
-```
-
-## Release workflow
-
-In `narumiruna/typescript-template`, the workflow starts, but the release job is skipped. Projects created from this template run the job without changes to the workflow condition. Before publishing, update the package name and repository URL in `package.json`.
-
-Create and commit a changeset with each releasable change:
-
-```sh
-npm run changeset
-```
-
-When changesets reach `main`, [`.github/workflows/release.yml`](.github/workflows/release.yml) opens or updates a version pull request. Merging that pull request publishes the package, creates its Git tag, and creates a GitHub release.
-
-Release runs are serialized per branch and do not cancel an active release.
-
-Publishing uses npm trusted publishing. Configure the npm package's trusted publisher with this GitHub repository and the `release.yml` workflow. Also allow GitHub Actions to create pull requests in the repository's Actions settings.
+Before releasing from this repository, update the package's npm trusted publisher
+to use `narumiruna/diagram-viewer` and the `release.yml` workflow. Configure the
+repository's `PAT_TOKEN` secret for the workflow to create and update version
+pull requests.
