@@ -212,8 +212,8 @@ export function createDiagramViewWithGestureControl(
     ) {
       return false
     }
-    const visibility = getComputedStyle(stage).visibility
-    return visibility !== "hidden" && visibility !== "collapse"
+    const { display, visibility } = getComputedStyle(stage)
+    return display !== "none" && visibility !== "hidden" && visibility !== "collapse"
   }
 
   function hasSpace(): boolean {

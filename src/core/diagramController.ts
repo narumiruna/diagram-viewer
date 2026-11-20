@@ -468,6 +468,7 @@ export function createDiagramController(
         case "fullscreen":
           return toggleFullscreen()
         case "source":
+          if (!state.showSource) camera.stopGestures()
           publish({ showSource: !state.showSource })
           if (!state.showSource) nextFrame(refresh)
           return

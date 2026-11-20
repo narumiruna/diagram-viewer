@@ -33,6 +33,18 @@ function flushFrames() {
   for (const callback of pending) callback(0)
 }
 
+function dragPointer(type: "pointerdown" | "pointermove", clientX: number) {
+  return new PointerEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    pointerId: 7,
+    pointerType: "mouse",
+    isPrimary: true,
+    clientX,
+    clientY: 150,
+  })
+}
+
 function fixture(options: DiagramOptions = { source: "source" }) {
   const root = document.createElement("div")
   const button = document.createElement("button")
@@ -210,17 +222,7 @@ describe("diagram controller", () => {
       const release = vi.spyOn(viewport, "releasePointerCapture")
       controller.run("zoomIn")
       const transform = stage.style.transform
-      viewport.dispatchEvent(
-        new PointerEvent("pointerdown", {
-          bubbles: true,
-          cancelable: true,
-          pointerId: 7,
-          pointerType: "mouse",
-          isPrimary: true,
-          clientX: 250,
-          clientY: 150,
-        }),
-      )
+      viewport.dispatchEvent(dragPointer("pointerdown", 250))
       expect(capture).toHaveBeenCalledWith(7)
 
       stage.innerHTML = missing ? "" : '<svg viewBox="0 0 250 100"></svg>'
@@ -235,18 +237,30 @@ describe("diagram controller", () => {
       stage.innerHTML = '<svg viewBox="0 0 1000 500"></svg>'
       controller.update({ ...options, ready: true })
       flushFrames()
-      const move = new PointerEvent("pointermove", {
-        cancelable: true,
-        pointerId: 7,
-        pointerType: "mouse",
-        clientX: 200,
-        clientY: 150,
-      })
+      const move = dragPointer("pointermove", 200)
       document.dispatchEvent(move)
       expect(move.defaultPrevented).toBe(false)
       expect(stage.style.transform).toBe(transform)
     },
   )
+
+  it("does not resume an old drag after a quick switch to source and back", () => {
+    const { controller, stage, viewport } = fixture()
+    const capture = vi.spyOn(viewport, "setPointerCapture")
+    const release = vi.spyOn(viewport, "releasePointerCapture")
+    controller.run("zoomIn")
+    const transform = stage.style.transform
+    viewport.dispatchEvent(dragPointer("pointerdown", 250))
+    expect(capture).toHaveBeenCalledWith(7)
+
+    controller.run("source")
+    expect(controller.getState().showSource).toBe(true)
+    controller.run("source")
+    expect(controller.getState().showSource).toBe(false)
+    document.dispatchEvent(dragPointer("pointermove", 200))
+    expect(stage.style.transform).toBe(transform)
+    expect(release).toHaveBeenCalledExactlyOnceWith(7)
+  })
 
   it("refreshes host-owned content without replacing chart children", () => {
     const { controller, stage } = fixture()
