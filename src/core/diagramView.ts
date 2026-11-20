@@ -33,6 +33,8 @@ export interface DiagramPoint {
 
 export interface DiagramViewController {
   destroy(): void
+  /** Release active pointers without refreshing content or changing the camera. */
+  cancelGestures(): void
   getState(): Readonly<DiagramViewState>
   refresh(forceCamera?: boolean): void
   reset(): void
@@ -671,6 +673,7 @@ export function createDiagramViewWithGestureControl(
       viewport.removeEventListener("wheel", onWheel)
       viewport.removeEventListener("keydown", onKeyDown)
     },
+    cancelGestures: stopGestures,
     getState: () => state,
     refresh,
     reset,

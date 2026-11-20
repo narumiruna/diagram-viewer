@@ -256,6 +256,33 @@ describe("diagram controller", () => {
     expect(controller.getState().scale).toBe(1)
   })
 
+  it.each([false, true])("releases suspended gestures with missing SVG: %s", (missingSvg) => {
+    const { controller, viewport, stage } = fixture({ source: "text", svg: "SVG", ready: true })
+    controller.run("zoomIn")
+    const before = controller.getState()
+    const transform = stage.style.transform
+    const capture = vi.spyOn(viewport, "setPointerCapture")
+    const release = vi.spyOn(viewport, "releasePointerCapture")
+    const down = new Event("pointerdown", { bubbles: true, cancelable: true })
+    Object.defineProperties(down, {
+      pointerId: { value: 7 },
+      pointerType: { value: "mouse" },
+      button: { value: 0 },
+      clientX: { value: 250 },
+      clientY: { value: 150 },
+    })
+    viewport.dispatchEvent(down)
+    expect(capture).toHaveBeenCalledWith(7)
+    stage.innerHTML = missingSvg ? "" : '<svg viewBox="0 0 250 100"></svg>'
+    const query = vi.spyOn(stage, "querySelector")
+    controller.update({ source: "text", svg: "SVG", ready: false })
+    flushFrames()
+    expect(release).toHaveBeenCalledExactlyOnceWith(7)
+    expect(query).not.toHaveBeenCalled()
+    expect(controller.getState().scale).toBe(before.scale)
+    expect(stage.style.transform).toBe(transform)
+  })
+
   it("keeps pure action metadata usable before a mounted controller", () => {
     expect(getDiagramAction(initialDiagramState, { source: "", ready: false }, "zoomIn")).toEqual({
       label: "Zoom in",

@@ -271,11 +271,21 @@ camera.destroy()
   after a resize. Set `focusMaxScale` to cap automatic focus zoom (default 4).
   A focus region never zooms below the overview scale, and manual zoom still
   goes up to 400%.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:014c2b1da3c98e1c9855c93715e28b295d29ccf95c2b9e085f3934fb7c98f941 -->
+
 - Hidden, detached, and zero-space viewports do not handle camera input. Use
   `isInteractionEnabled: () => ready` if the host needs to suspend camera input
   while it renders or replaces content. Call `camera.refresh()` after a host
   state change to release active pointer capture and apply the current view
-  when it becomes visible again. The Escape hook can still close fullscreen.
+  when it becomes visible again. Use `camera.cancelGestures()` to release active
+  pointers without reading content or changing the view. The Escape hook can
+  still close fullscreen.
+
+
+<!-- /coderabbit-ai-generated:v1 -->
+
 - The host retains activation, accessible names, keyboard handlers, and focus
   styles. The camera does not install node actions or change focusability.
 - `destroy()` removes camera listeners and releases active pointer captures. The

@@ -77,13 +77,15 @@ export function HostSizedCameraExample(
   stage: HTMLElement,
   isReady: () => boolean,
 ) {
-  return createDiagramView(viewport, stage, {
+  const camera = createDiagramView(viewport, stage, {
     manageInlineHeight: false,
     resetMode: "native",
     focusMaxScale: 2,
     isInteractionEnabled: isReady,
     getKeyboardPan: () => "shift-arrows",
   })
+  // Before replacing content, call camera.cancelGestures(); refresh after rendering.
+  return camera
 }
 
 /** The host renderer owns and finalizes children; ready signals completion. */
