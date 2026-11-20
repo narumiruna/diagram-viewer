@@ -311,10 +311,11 @@ Run `npm run changeset` and commit the resulting file with each releasable
 change. Use `patch` for fixes, `minor` for features, and `major` for breaking
 changes. Run `npm run changeset -- status` to inspect pending changesets.
 
-When changesets reach `main`, the [release workflow](.github/workflows/release.yml)
-opens or updates a pull request with the new version, changelog, and npm lockfile.
-Merging that pull request publishes the new version to npm and creates a Git tag
-and a GitHub release.
+The [release workflow](.github/workflows/release.yml) runs `npm ci` to install
+Changesets and the build tools. When changesets reach `main`, it opens or updates
+a pull request with the new version, changelog, and npm lockfile. Merging that
+pull request publishes the new version to npm and creates a Git tag and a GitHub
+release.
 
 Before releasing from this repository, update the package's npm trusted publisher
 to use `narumiruna/diagram-viewer` and the `release.yml` workflow. Configure the
