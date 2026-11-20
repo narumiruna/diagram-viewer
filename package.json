@@ -40,7 +40,7 @@
     "**/*.css"
   ],
   "scripts": {
-    "build": "node build.mjs",
+    "build": "node scripts/build.mjs",
     "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check .",

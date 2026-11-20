@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process"
 import { copyFile, rm } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 
-const root = new URL("./", import.meta.url)
+const root = new URL("../", import.meta.url)
 await rm(new URL("dist/", root), { recursive: true, force: true })
 const result = spawnSync(
   process.execPath,
