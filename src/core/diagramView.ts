@@ -123,6 +123,14 @@ export function createDiagramView(
   stage: HTMLElement,
   options: DiagramViewOptions = {},
 ): DiagramViewController {
+  return createDiagramViewWithGestureControl(viewport, stage, options)
+}
+
+export function createDiagramViewWithGestureControl(
+  viewport: HTMLElement,
+  stage: HTMLElement,
+  options: DiagramViewOptions,
+): DiagramViewController & { stopGestures(): void } {
   const state: DiagramViewState = {
     cameraMode: "overview",
     naturalHeight: 1,
@@ -668,6 +676,7 @@ export function createDiagramView(
     reset,
     setCameraMode,
     setFocusRegion,
+    stopGestures,
     zoomBy,
   }
 }

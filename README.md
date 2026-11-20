@@ -164,12 +164,12 @@ export function HostChart({ source }: { source: string }) {
 }
 ```
 
-`ready: false` disables camera/export actions but keeps source access. Set it to
-true after rendering. For replacements while `ready` remains true, change
-`contentVersion` after the DOM update; this refreshes the camera. Changing `svg`
-also refreshes the camera. Source mode and fullscreen retain the same SVG and
-host mount. `refreshing`, `renderError`, and `retryRender` are host-owned render
-state; retry execution is not a renderer plugin system.
+`ready: false` ends active camera gestures and disables camera/export actions
+but keeps source access. Set it to true after rendering. For replacements while
+`ready` remains true, change `contentVersion` after the DOM update; this refreshes
+the camera. Changing `svg` also refreshes the camera. Source mode and fullscreen
+retain the same SVG and host mount. `refreshing`, `renderError`, and `retryRender`
+are host-owned render state; retry execution is not a renderer plugin system.
 
 When keeping a previous successful SVG during refresh, keep its export
 `background` paired with it until a new render succeeds. `background` affects
