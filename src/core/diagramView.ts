@@ -67,6 +67,8 @@ interface PointerPosition {
   clientY: number
 }
 
+type VisibleRegionListener = (region: Readonly<DiagramRegion>) => void
+
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
 }
@@ -123,14 +125,17 @@ export function createDiagramView(
   stage: HTMLElement,
   options: DiagramViewOptions = {},
 ): DiagramViewController {
-  return createDiagramViewWithGestureControl(viewport, stage, options)
+  return createDiagramViewWithGestureControl(viewport, stage, options).camera
 }
 
 export function createDiagramViewWithGestureControl(
   viewport: HTMLElement,
   stage: HTMLElement,
   options: DiagramViewOptions,
-): DiagramViewController & { stopGestures(): void } {
+): {
+  camera: DiagramViewController & { stopGestures(): void }
+  subscribeVisibleRegion(listener: VisibleRegionListener): () => void
+} {
   const state: DiagramViewState = {
     cameraMode: "overview",
     naturalHeight: 1,
@@ -161,6 +166,8 @@ export function createDiagramViewWithGestureControl(
   let cameraMode: DiagramCameraMode = "overview"
   let requestedRegion: DiagramRegion | undefined
   let activeRegion: DiagramRegion | undefined
+  let measuredDiagram: SVGSVGElement | undefined
+  let visibleRegionListeners: Set<VisibleRegionListener> | undefined
   let destroyed = false
 
   const expanded = () => options.isExpanded?.() === true
@@ -228,6 +235,51 @@ export function createDiagramViewWithGestureControl(
     return isVisible() && hasSpace() && options.isInteractionEnabled?.() !== false
   }
 
+  function getVisibleRegion(inset = padding()): Readonly<DiagramRegion> | undefined {
+    if (
+      !measuredDiagram ||
+      !stage.contains(measuredDiagram) ||
+      !isVisible() ||
+      options.isInteractionEnabled?.() === false
+    ) {
+      return undefined
+    }
+    const { naturalWidth, naturalHeight, scale, x, y } = state
+    const width = naturalWidth * scale
+    const height = naturalHeight * scale
+    // The camera translation and client box share one origin. Clip to the scaled stage
+    // before normalizing, so padding and empty space around the diagram do not count.
+    const left = Math.max(0, inset.left - x)
+    const top = Math.max(0, inset.top - y)
+    const right = Math.min(width, viewport.clientWidth - inset.right - x)
+    const bottom = Math.min(height, viewport.clientHeight - inset.bottom - y)
+    const region = {
+      x: left / width,
+      y: top / height,
+      width: (right - left) / width,
+      height: (bottom - top) / height,
+    }
+    return validRegion(region) ? Object.freeze(region) : undefined
+  }
+
+  function subscribeVisibleRegion(listener: VisibleRegionListener): () => void {
+    if (destroyed) return () => {}
+    visibleRegionListeners ??= new Set()
+    const listeners = visibleRegionListeners
+    let previous: Readonly<DiagramRegion> | undefined
+    const notify: VisibleRegionListener = (region) => {
+      if (sameRegion(region, previous)) return
+      previous = region
+      listener(region)
+    }
+    listeners.add(notify)
+    const current = getVisibleRegion()
+    if (current) notify(current)
+    return () => {
+      listeners.delete(notify)
+    }
+  }
+
   function updateInlineHeight(): void {
     if (options.manageInlineHeight === false) return
     if (expanded()) {
@@ -278,6 +330,10 @@ export function createDiagramViewWithGestureControl(
       state.naturalHeight * state.scale > viewport.clientHeight - inset.top - inset.bottom + 1
     viewport.dataset.diagramCropped = String(cropped)
     options.onCropChange?.(cropped)
+    if (visibleRegionListeners?.size) {
+      const region = getVisibleRegion(inset)
+      if (region) for (const listener of visibleRegionListeners) listener(region)
+    }
   }
 
   function updateFocusFrame(region?: DiagramRegion): void {
@@ -386,11 +442,13 @@ export function createDiagramViewWithGestureControl(
     if (resolved !== activeRegion && cameraMode === "focus") state.userModified = false
     updateFocusFrame(resolved)
     if (!isVisible()) {
+      measuredDiagram = undefined
       stopGestures()
       return
     }
     updateInlineHeight()
     const usable = hasSpace()
+    measuredDiagram = usable ? diagram : undefined
     if (!usable || options.isInteractionEnabled?.() === false || forceCamera) stopGestures()
     if (!usable) return
     previousWidth = viewport.clientWidth
@@ -654,10 +712,11 @@ export function createDiagramViewWithGestureControl(
   if (validRegion(options.focusRegion)) setFocusRegion(options.focusRegion)
   else refresh()
 
-  return {
+  const camera = {
     destroy() {
       if (destroyed) return
       destroyed = true
+      visibleRegionListeners?.clear()
       cancelAnimationFrame(resizeFrame)
       resizeObserver?.disconnect()
       updateFocusFrame()
@@ -679,4 +738,5 @@ export function createDiagramViewWithGestureControl(
     stopGestures,
     zoomBy,
   }
+  return { camera, subscribeVisibleRegion }
 }

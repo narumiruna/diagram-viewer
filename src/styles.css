@@ -183,6 +183,352 @@
   min-height: 8rem;
 }
 
+/* Opt-in layouts keep the live viewport in the same slot as the default viewer. */
+.ndv-viewer-alt {
+  --_ndv-accent: var(--ndv-focus, #1463d6);
+  --_ndv-overview-fill: color-mix(in srgb, var(--_ndv-accent) 16%, transparent);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-inline-size: 0;
+  container: ndv-viewer / inline-size;
+}
+
+.ndv-viewer-alt:fullscreen,
+.ndv-viewer-alt.diagram-expanded {
+  display: grid;
+  grid-template-rows: auto minmax(auto, 1fr) auto auto auto;
+  /* Keep wrapped controls reachable even in a short fullscreen window. */
+  overflow: auto;
+}
+
+.ndv-viewer-alt > :is(.ndv-toolbar, .ndv-source, .ndv-pan-hint, .ndv-canvas-controls, .ndv-status) {
+  grid-column: 1 / -1;
+}
+
+.ndv-viewer-alt > .ndv-toolbar {
+  position: relative;
+  grid-row: 1;
+  z-index: 1;
+  background: var(--ndv-background);
+  border-start-start-radius: inherit;
+  border-start-end-radius: inherit;
+}
+
+.ndv-root.ndv-viewer-alt > .ndv-viewport {
+  grid-area: 2 / 1;
+  border-radius: 0;
+}
+
+.ndv-viewer-alt > .ndv-viewport:focus-visible {
+  outline-offset: -3px;
+}
+
+.ndv-viewer-alt > .ndv-source {
+  grid-row: 2;
+  background: var(--ndv-background);
+}
+
+.ndv-viewer-alt:is(:fullscreen, .diagram-expanded) > .ndv-source {
+  max-block-size: none;
+}
+
+.ndv-viewer-alt > :is(.ndv-pan-hint, .ndv-canvas-controls) {
+  grid-row: 4;
+}
+
+.ndv-viewer-alt > .ndv-status {
+  grid-row: 5;
+  background: var(--ndv-background);
+  border-end-start-radius: inherit;
+  border-end-end-radius: inherit;
+}
+
+.ndv-viewer-alt .ndv-control-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  border: 1px solid var(--ndv-border);
+  border-radius: var(--ndv-radius, 6px);
+  padding: 0.25rem;
+  background: var(--ndv-background);
+}
+
+.ndv-viewer-alt :is(.ndv-control-wrap, .ndv-control) {
+  max-inline-size: 100%;
+}
+
+.ndv-viewer-alt .ndv-control {
+  min-inline-size: max(44px, 2.75rem);
+  min-block-size: max(44px, 2.75rem);
+}
+
+.ndv-viewer-alt .ndv-control[aria-expanded="true"] {
+  border-color: var(--_ndv-accent);
+  background: color-mix(in srgb, var(--_ndv-accent) 12%, var(--ndv-background));
+}
+
+.ndv-viewer-alt .ndv-labeled-button {
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.ndv-viewer-alt .ndv-labeled-button svg {
+  flex: none;
+}
+
+/* Keep the fallback inside the toolbar width instead of clipping it at a wrapped edge. */
+.ndv-viewer-alt .ndv-control-wrap {
+  position: static;
+}
+
+.ndv-viewer-alt .ndv-tooltip {
+  left: auto;
+  inset-inline-end: 0.75rem;
+  max-inline-size: min(10rem, calc(100% - 1.5rem));
+}
+
+.ndv-viewer-alt .ndv-camera .ndv-tooltip {
+  top: auto;
+  inset-block-end: calc(100% + 4px);
+}
+
+.ndv-viewer-alt.ndv-canvas {
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--ndv-foreground) 18%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 18px 18px;
+}
+
+.ndv-viewer-alt.ndv-canvas > .ndv-viewport {
+  background: transparent;
+}
+
+.ndv-viewer-alt.ndv-canvas > .ndv-grouped-toolbar {
+  justify-content: flex-end;
+}
+
+.ndv-viewer-alt .ndv-viewer-heading {
+  min-inline-size: 0;
+  margin-inline-end: auto;
+  overflow-wrap: anywhere;
+}
+
+.ndv-viewer-alt .ndv-viewer-heading :is(strong, small) {
+  display: block;
+}
+
+.ndv-viewer-alt .ndv-canvas-controls {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  border-block-start: 1px solid var(--ndv-border);
+  border-end-start-radius: inherit;
+  border-end-end-radius: inherit;
+  padding: 0.5rem 0.75rem;
+  background: color-mix(in srgb, var(--ndv-control) 30%, var(--ndv-background));
+}
+
+.ndv-viewer-alt .ndv-canvas-controls .ndv-pan-hint {
+  border: 0;
+  padding: 0;
+}
+
+.ndv-viewer-alt .ndv-camera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.ndv-viewer-alt .ndv-camera output {
+  min-inline-size: 3rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Where supported, keep tooltips next to the button, even as controls wrap. */
+@supports (anchor-scope: --ndv-trigger) and
+  (position-area: block-end span-inline-end) and
+  (position-try-fallbacks: flip-inline) {
+  .ndv-viewer-alt {
+    position: relative;
+  }
+
+  .ndv-viewer-alt > :is(.ndv-toolbar, .ndv-canvas-controls) {
+    position: static;
+  }
+
+  .ndv-viewer-alt .ndv-control-wrap {
+    anchor-scope: --ndv-trigger;
+  }
+
+  .ndv-viewer-alt .ndv-control {
+    anchor-name: --ndv-trigger;
+  }
+
+  .ndv-viewer-alt .ndv-tooltip {
+    inset: auto;
+    margin-block-start: 4px;
+    position-anchor: --ndv-trigger;
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-inline;
+  }
+
+  .ndv-viewer-alt .ndv-camera .ndv-tooltip {
+    inset: auto;
+    margin-block: 0 4px;
+    position-area: block-start span-inline-end;
+  }
+}
+
+.ndv-viewer-alt .ndv-overview:not([hidden]) {
+  --_ndv-overview-limit: 3.75rem;
+  display: grid;
+  grid-area: 3 / 1 / auto / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  justify-self: end;
+  gap: 0.25rem 0.75rem;
+  inline-size: min(calc(100% - 1.5rem), 17rem);
+  margin: 0 0.75rem 0.75rem;
+  border: 1px solid var(--ndv-border);
+  border-radius: var(--ndv-radius, 8px);
+  padding: 0.625rem;
+  background: var(--ndv-background);
+  box-shadow: 0 2px 8px #0001;
+  overflow-wrap: anywhere;
+}
+
+.ndv-viewer-alt .ndv-overview-title {
+  align-self: end;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.ndv-viewer-alt .ndv-overview-key {
+  display: flex;
+  align-self: start;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.ndv-viewer-alt .ndv-overview-key::before {
+  content: "";
+  flex: 0 0 0.75rem;
+  block-size: 0.75rem;
+  border: 1px solid var(--_ndv-accent);
+  border-radius: 2px;
+  background: var(--_ndv-overview-fill);
+}
+
+.ndv-viewer-alt .ndv-overview-image {
+  position: relative;
+  grid-area: 1 / 2 / span 2;
+  justify-self: center;
+  /* Size the box to the real image, with no letterbox around the frame. */
+  inline-size: min(100%, calc(var(--ndv-overview-ratio) * var(--_ndv-overview-limit)));
+  aspect-ratio: var(--ndv-overview-ratio);
+  background: var(--ndv-control);
+  overflow: clip;
+  pointer-events: none;
+}
+
+.ndv-viewer-alt .ndv-overview-image img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.ndv-viewer-alt .ndv-overview-frame {
+  position: absolute;
+  border-radius: 2px;
+  background: var(--_ndv-overview-fill);
+  /* A border would impose a minimum size on very small visible regions. */
+  box-shadow: inset 0 0 0 2px var(--_ndv-accent);
+}
+
+@container ndv-viewer (inline-size < 28rem) {
+  .ndv-viewer-alt.ndv-canvas > .ndv-grouped-toolbar {
+    justify-content: flex-start;
+  }
+
+  .ndv-viewer-alt .ndv-viewer-heading {
+    flex-basis: 100%;
+  }
+
+  .ndv-viewer-alt .ndv-camera {
+    gap: 0.25rem;
+  }
+}
+
+@container ndv-viewer (inline-size >= 38rem) {
+  .ndv-viewer-alt.ndv-floating > .ndv-canvas-controls {
+    /* The in-flow lane shares the dotted ground without covering the diagram. */
+    border: 0;
+    padding: 0.5rem 0.75rem 0.75rem;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .ndv-viewer-alt.ndv-floating .ndv-camera {
+    margin-inline-start: auto;
+    padding: 0.25rem;
+  }
+
+  .ndv-viewer-alt.ndv-floating .ndv-canvas-controls :is(.ndv-pan-hint, .ndv-camera) {
+    border: 1px solid var(--ndv-border);
+    border-radius: var(--ndv-radius, 8px);
+    background: var(--ndv-background);
+    box-shadow: 0 2px 8px #0002;
+  }
+
+  .ndv-viewer-alt.ndv-floating .ndv-canvas-controls .ndv-pan-hint {
+    padding: 0.4375rem 0.625rem;
+  }
+
+  .ndv-viewer-alt.ndv-floating .ndv-camera .ndv-control {
+    pointer-events: auto;
+  }
+}
+
+@container ndv-viewer (inline-size >= 48rem) {
+  .ndv-viewer-alt .ndv-overview:not([hidden]) {
+    --_ndv-overview-limit: 8rem;
+    grid-area: 2 / 2;
+    grid-template-columns: minmax(0, 1fr);
+    align-self: end;
+    gap: 0.5rem;
+    inline-size: 13rem;
+    margin-block-start: 0.75rem;
+  }
+
+  .ndv-viewer-alt .ndv-overview-image {
+    grid-area: auto;
+  }
+}
+
 @media (forced-colors: active) {
   .ndv-control {
     border-color: ButtonText;
@@ -191,5 +537,16 @@
   .ndv-stage[data-ndv-focus-region]::after {
     border-color: Highlight;
     border-style: dashed;
+  }
+
+  .ndv-viewer-alt .ndv-overview-key::before,
+  .ndv-viewer-alt .ndv-control[aria-expanded="true"] {
+    border-color: Highlight;
+  }
+
+  .ndv-viewer-alt .ndv-overview-frame {
+    outline: 1px dashed Highlight;
+    outline-offset: -1px;
+    background: transparent;
   }
 }

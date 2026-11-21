@@ -5,6 +5,7 @@ import {
   DiagramStatus,
   DiagramToolbar,
   DiagramViewer,
+  type DiagramViewerProps,
   DiagramViewport,
   DiagramZoom,
   useDiagramAction,
@@ -122,6 +123,7 @@ function LiveChart() {
       <DiagramViewer
         source={'{"mark":"bar","params":[{"name":"minimum","bind":{"input":"range"}}]}'}
         hostManaged
+        overview={params.has("liveOverview") || undefined}
         stageRef={stage}
         ready={ready}
         renderError={error}
@@ -193,6 +195,83 @@ function SlideDeck() {
   )
 }
 
+function PresetFixture() {
+  const requestedToolbar = params.get("toolbar")
+  const [toolbar, setToolbar] = useState<DiagramViewerProps["toolbar"]>(
+    requestedToolbar === "classic" ||
+      requestedToolbar === "grouped" ||
+      requestedToolbar === "canvas"
+      ? requestedToolbar
+      : undefined,
+  )
+  const [content, setContent] = useState(params.has("missing") ? "missing" : "sequence")
+  const [ready, setReady] = useState(!params.has("loading"))
+  const [failed, setFailed] = useState(params.has("failed"))
+  const [narrow, setNarrow] = useState(false)
+  const [mounted, setMounted] = useState(true)
+  const source = content === "class" ? classSource : sequenceSource
+  // Move the viewBox origin but keep the artwork in the same place relative to it.
+  const svg =
+    failed || content === "missing"
+      ? undefined
+      : content === "class"
+        ? classSvg(dark)
+        : sequenceSvg(dark)
+            .replace('viewBox="0 0 1100 500"', 'viewBox="-73 -41 1100 500"')
+            .replace("<g fill=", '<g transform="translate(-73 -41)" fill=')
+  const controls = params.get("controls")
+  const display = params.get("display")
+  const props = {
+    toolbar,
+    canvasControls: controls === "docked" || controls === "floating" ? controls : undefined,
+    buttonDisplay: display === "icon" || display === "icon-and-text" ? display : undefined,
+    overview: params.has("noOverview") ? false : params.has("overview") || undefined,
+    source,
+    svg,
+    ready,
+    renderError: failed ? "Could not render the diagram." : undefined,
+    retryRender: () => setFailed(false),
+    style: theme,
+    className: "preset-viewer",
+    graphicName: "document diagram",
+    typeLabel: "sequence diagram",
+    filename: "preset-document",
+  } as const
+  return (
+    <main>
+      <h1>Viewer presets</h1>
+      <button type="button" onClick={() => setContent("class")}>
+        Replace SVG
+      </button>{" "}
+      <button type="button" onClick={() => setReady(true)}>
+        Finish loading
+      </button>{" "}
+      <button type="button" onClick={() => setNarrow((current) => !current)}>
+        {narrow ? "Widen viewer" : "Narrow viewer"}
+      </button>{" "}
+      <button type="button" onClick={() => setMounted((current) => !current)}>
+        {mounted ? "Unmount preset" : "Mount preset"}
+      </button>{" "}
+      {(["classic", "grouped", "canvas"] as const).map((name) => (
+        <button type="button" key={name} onClick={() => setToolbar(name)}>
+          Use {name} toolbar
+        </button>
+      ))}
+      <div style={{ width: narrow ? "min(100%, 360px)" : undefined }}>
+        {mounted && <DiagramViewer {...props} />}
+        {params.has("compare") && (
+          <DiagramViewer
+            {...props}
+            toolbar="classic"
+            canvasControls="floating"
+            buttonDisplay="icon"
+          />
+        )}
+      </div>
+    </main>
+  )
+}
+
 function App() {
   const [showClass, setShowClass] = useState(initialClass)
   const [mounted, setMounted] = useState(true)
@@ -211,11 +290,12 @@ function App() {
       {mounted && (
         <>
           <section aria-labelledby="default-title">
-            <h2 id="default-title">Default {showClass ? "class" : "sequence"} diagram</h2>
+            <h2 id="default-title">Classic {showClass ? "class" : "sequence"} diagram</h2>
             <DiagramViewer
               source={source}
               svg={svg}
               style={theme}
+              toolbar="classic"
               className="default-viewer"
               graphicName="document diagram"
               filename="standalone-document"
@@ -268,4 +348,6 @@ function App() {
 
 const root = document.getElementById("root")
 if (!root) throw new Error("Missing fixture root")
-createRoot(root).render(params.has("focus") ? <SlideDeck /> : <App />)
+createRoot(root).render(
+  params.has("focus") ? <SlideDeck /> : params.has("presets") ? <PresetFixture /> : <App />,
+)
