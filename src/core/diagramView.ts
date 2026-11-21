@@ -149,7 +149,7 @@ export function createDiagramViewWithGestureControl(
   const captures = new Map<number, Element>()
   const pendingTouchClicks = new Set<number>()
   let touchMoved = false
-  let mousePointerID: number | undefined
+  let mousePointerId: number | undefined
   let mouseLast: DiagramPoint | undefined
   let touchLast: DiagramPoint | undefined
   let pinch:
@@ -497,11 +497,11 @@ export function createDiagramViewWithGestureControl(
     }
   }
 
-  function releaseCapture(pointerID: number): void {
-    const owner = captures.get(pointerID)
-    captures.delete(pointerID)
+  function releaseCapture(pointerId: number): void {
+    const owner = captures.get(pointerId)
+    captures.delete(pointerId)
     try {
-      owner?.releasePointerCapture(pointerID)
+      owner?.releasePointerCapture(pointerId)
     } catch {
       // The browser may already have released or cancelled this pointer.
     }
@@ -509,12 +509,12 @@ export function createDiagramViewWithGestureControl(
 
   function stopGestures(): void {
     pointers.clear()
-    mousePointerID = undefined
+    mousePointerId = undefined
     mouseLast = undefined
     touchLast = undefined
     pinch = undefined
     pendingTouchClicks.clear()
-    for (const pointerID of captures.keys()) releaseCapture(pointerID)
+    for (const pointerId of captures.keys()) releaseCapture(pointerId)
   }
 
   function isInteractiveTarget(target: EventTarget | null, touchNode?: SVGElement): boolean {
@@ -563,8 +563,8 @@ export function createDiagramViewWithGestureControl(
       }
       return
     }
-    if (event.button !== 0 || event.isPrimary === false || mousePointerID !== undefined) return
-    mousePointerID = event.pointerId
+    if (event.button !== 0 || event.isPrimary === false || mousePointerId !== undefined) return
+    mousePointerId = event.pointerId
     mouseLast = { x: event.clientX, y: event.clientY }
     capture(event)
     viewport.focus({ preventScroll: true })
@@ -573,7 +573,7 @@ export function createDiagramViewWithGestureControl(
 
   function onPointerMove(event: PointerEvent): void {
     const pointer = pointers.get(event.pointerId)
-    if (!pointer && event.pointerId !== mousePointerID) return
+    if (!pointer && event.pointerId !== mousePointerId) return
     if (!acceptsInput()) {
       stopGestures()
       return
@@ -598,7 +598,7 @@ export function createDiagramViewWithGestureControl(
       event.preventDefault()
       return
     }
-    if (event.pointerId !== mousePointerID || !mouseLast) return
+    if (event.pointerId !== mousePointerId || !mouseLast) return
     panBy(event.clientX - mouseLast.x, event.clientY - mouseLast.y)
     mouseLast = { x: event.clientX, y: event.clientY }
     event.preventDefault()
@@ -612,8 +612,8 @@ export function createDiagramViewWithGestureControl(
       const remaining = [...pointers.values()][0]
       touchLast = remaining ? { x: remaining.clientX, y: remaining.clientY } : undefined
     }
-    if (event.pointerId === mousePointerID) {
-      mousePointerID = undefined
+    if (event.pointerId === mousePointerId) {
+      mousePointerId = undefined
       mouseLast = undefined
     }
     releaseCapture(event.pointerId)

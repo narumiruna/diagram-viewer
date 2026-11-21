@@ -41,7 +41,7 @@ interface DiagramContextValue {
   root: { current: HTMLDivElement | null }
   viewport: { current: HTMLElement | null }
   stage: { current: HTMLDivElement | null }
-  sourceID: string
+  sourceId: string
   graphicName: string
   stageClassName?: string
   hostManaged: boolean
@@ -83,7 +83,7 @@ export function DiagramRoot({
   const controller = useRef<ViewerController | undefined>(undefined)
   const currentOptions = useRef(options)
   currentOptions.current = options
-  const sourceID = useId()
+  const sourceId = useId()
   const [state, setState] = useState<Readonly<DiagramState>>(initialDiagramState)
 
   useEffect(() => {
@@ -119,7 +119,7 @@ export function DiagramRoot({
         root,
         viewport,
         stage,
-        sourceID,
+        sourceId,
         graphicName,
         stageClassName,
         hostManaged,
@@ -158,7 +158,7 @@ export function useDiagramState() {
 
 /** Spread these props onto a native button; do not replace its handler or state. */
 export function useDiagramAction(action: DiagramAction): ButtonHTMLAttributes<HTMLButtonElement> {
-  const { state, options, controller, sourceID } = useDiagramContext()
+  const { state, options, controller, sourceId } = useDiagramContext()
   const binding = getDiagramAction(state, options, action)
   return {
     type: "button",
@@ -168,7 +168,7 @@ export function useDiagramAction(action: DiagramAction): ButtonHTMLAttributes<HT
     ...(action === "fullscreen" && binding.disabled ? { "aria-disabled": true } : {}),
     "aria-pressed": binding.pressed,
     "aria-busy": binding.busy || undefined,
-    "aria-controls": action === "source" ? sourceID : undefined,
+    "aria-controls": action === "source" ? sourceId : undefined,
     onClick: () => {
       void controller.current?.run(action)
     },
@@ -383,11 +383,11 @@ export function DiagramViewport({
 }
 
 export function DiagramSource({ className }: { className?: string }) {
-  const { options, state, sourceID } = useDiagramContext()
+  const { options, state, sourceId } = useDiagramContext()
   return (
     // biome-ignore lint/a11y/useSemanticElements: A named scrollable pre preserves code layout and accessibility.
     <pre
-      id={sourceID}
+      id={sourceId}
       className={`ndv-source${className ? ` ${className}` : ""}`}
       hidden={!state.showSource}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: A scrollable source region must be keyboard reachable.
@@ -503,7 +503,7 @@ function ViewerContent({
   const { controller, options, state, stage, viewport, hostManaged, graphicName } =
     useDiagramContext()
   const thumbnail = useOverviewThumbnail(overview && !hostManaged ? options.svg : undefined, stage)
-  const overviewID = useId()
+  const overviewId = useId()
   const [open, setOpen] = useState(false)
   const subscribe = useCallback<ViewerController["subscribeVisibleRegion"]>(
     (listener) => controller.current?.subscribeVisibleRegion(listener) ?? (() => {}),
@@ -551,7 +551,7 @@ function ViewerContent({
           className={labels ? "ndv-labeled-button" : undefined}
           aria-label="Overview"
           showTooltip={!labels}
-          aria-controls={overviewID}
+          aria-controls={overviewId}
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
         >
@@ -613,7 +613,7 @@ function ViewerContent({
       </DiagramToolbar>
       <DiagramViewport stageRef={stageRef} aria-labelledby={viewportLabelledBy} />
       {available && (
-        <ViewerOverview id={overviewID} thumbnail={thumbnail} open={open} subscribe={subscribe} />
+        <ViewerOverview id={overviewId} thumbnail={thumbnail} open={open} subscribe={subscribe} />
       )}
       {canvas ? [sourceView, lowerControls] : [lowerControls, sourceView]}
       <DiagramStatus />
