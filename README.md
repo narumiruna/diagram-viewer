@@ -4,9 +4,9 @@ React diagram frame, composable controls, and browser-only core. It has no
 Mermaid, Vega, Radix, or Morsel runtime dependency. Rendering stays in the host.
 The verified React and React DOM version is **19.3.1**. License: [MIT](LICENSE).
 
-Once GitHub Pages is enabled, the [project site](https://narumiruna.github.io/diagram-viewer/)
-lets you compare settings on the same interactive diagram, with JSX for each
-example.
+The [project site](https://narumiruna.github.io/diagram-viewer/) previews the
+main branch. It can show settings that are not in the latest npm release. See
+the [release notes](CHANGELOG.md) for available features.
 
 ## Install
 
@@ -55,6 +55,12 @@ The React `DiagramViewer` accepts these presentation options:
 | `canvasControls` | `"docked"`, `"floating"` | `"floating"` | Only for the canvas preset. Use a full-width bottom bar or float the hint and controls at the bottom corners. Narrow viewers use the bottom bar. |
 | `buttonDisplay` | `"icon"`, `"icon-and-text"` | `"icon"` | Change all built-in Viewer buttons, including Overview. Icon-only buttons keep accessible names and pointer/keyboard tooltips. |
 | `overview` | `false`, `true` | `true` for `"canvas"`; `false` otherwise | Add an initially closed Overview next to the view controls in any preset, if a thumbnail is available. |
+
+When a page has several viewers, give each viewport a distinct accessible name.
+Set `viewportLabelledBy` to the ID of an existing heading or label. When
+composing controls, set `aria-labelledby` on `DiagramViewport` instead. If you
+omit the reference, the viewport uses `graphicName` in its name. Keyboard
+shortcuts are exposed as a separate accessible description.
 
 ```tsx
 // Keep the original interface when upgrading from 0.4 or earlier.

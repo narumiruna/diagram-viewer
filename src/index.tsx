@@ -10,6 +10,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react"
@@ -162,7 +163,9 @@ export function useDiagramAction(action: DiagramAction): ButtonHTMLAttributes<HT
   return {
     type: "button",
     "aria-label": binding.label,
-    disabled: binding.disabled,
+    // Keep the fullscreen opener focusable while the browser completes the transition.
+    disabled: action === "fullscreen" ? undefined : binding.disabled,
+    ...(action === "fullscreen" && binding.disabled ? { "aria-disabled": true } : {}),
     "aria-pressed": binding.pressed,
     "aria-busy": binding.busy || undefined,
     "aria-controls": action === "source" ? sourceID : undefined,
@@ -228,43 +231,80 @@ function ControlIcon({ path }: { path: string }) {
 function ControlButton({
   children,
   className,
+  showTooltip = true,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement> }) {
-  const tooltipID = useId()
-  const [tooltip, setTooltip] = useState(false)
-  const name = props["aria-label"]
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  ref?: Ref<HTMLButtonElement>
+  showTooltip?: boolean
+}) {
+  const tooltip = useRef<HTMLSpanElement>(null)
+  const [hovered, setHovered] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
+  const label = props["aria-label"]
+  const visible =
+    showTooltip && (hovered || focused) && !dismissed && !props.disabled && !props["aria-disabled"]
+
+  useLayoutEffect(() => {
+    const tip = tooltip.current
+    const wrapper = tip?.parentElement
+    const view = tip?.ownerDocument.defaultView
+    if (!tip || !wrapper || !view || !visible || !label) return
+
+    const document = view.document
+    const preferAbove = wrapper.closest(".ndv-camera") !== null
+    const place = () => {
+      const { left, top, bottom } = wrapper.getBoundingClientRect()
+      const { width, height } = tip.getBoundingClientRect()
+      const edge = 4
+      const right = document.documentElement.clientWidth - edge
+      const below = document.documentElement.clientHeight - bottom
+      const x = Math.max(edge, Math.min(left, right - width))
+      tip.style.left = `${x - left}px`
+      tip.toggleAttribute("data-above", preferAbove ? top >= height : below < height && top > below)
+    }
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDismissed(true)
+    }
+    place()
+    view.addEventListener("resize", place)
+    view.addEventListener("scroll", place, true)
+    document.addEventListener("keydown", dismiss, true)
+    return () => {
+      view.removeEventListener("resize", place)
+      view.removeEventListener("scroll", place, true)
+      document.removeEventListener("keydown", dismiss, true)
+    }
+  }, [visible, label])
+
   return (
-    <span className="ndv-control-wrap">
+    <span
+      className="ndv-control-wrap"
+      onPointerEnter={(event) => {
+        if (event.pointerType === "touch") return
+        setHovered(true)
+        setDismissed(false)
+      }}
+      onPointerLeave={() => setHovered(false)}
+    >
       <button
         {...props}
-        aria-describedby={tooltip ? tooltipID : undefined}
         className={`ndv-control diagram-control${className ? ` ${className}` : ""}`}
         onFocus={(event) => {
-          setTooltip(true)
+          setFocused(true)
+          setDismissed(false)
           props.onFocus?.(event)
         }}
         onBlur={(event) => {
-          setTooltip(false)
+          setFocused(false)
           props.onBlur?.(event)
-        }}
-        onPointerEnter={(event) => {
-          setTooltip(true)
-          props.onPointerEnter?.(event)
-        }}
-        onPointerLeave={(event) => {
-          setTooltip(false)
-          props.onPointerLeave?.(event)
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") setTooltip(false)
-          props.onKeyDown?.(event)
         }}
       >
         {children}
       </button>
-      {tooltip && !props.disabled && (
-        <span className="ndv-tooltip" id={tooltipID} role="tooltip">
-          {name}
+      {visible && label && (
+        <span className="ndv-tooltip" ref={tooltip} role="tooltip">
+          {label}
         </span>
       )}
     </span>
@@ -298,9 +338,14 @@ export function DiagramDefaultToolbar() {
 export interface DiagramViewportProps {
   className?: string
   stageRef?: Ref<HTMLDivElement>
+  "aria-labelledby"?: string
 }
 
-export function DiagramViewport({ className, stageRef }: DiagramViewportProps) {
+export function DiagramViewport({
+  className,
+  stageRef,
+  "aria-labelledby": labelledBy,
+}: DiagramViewportProps) {
   const { options, state, viewport, stage, graphicName, stageClassName, hostManaged } =
     useDiagramContext()
   const setStage = useCallback(
@@ -319,7 +364,9 @@ export function DiagramViewport({ className, stageRef }: DiagramViewportProps) {
       hidden={state.showSource}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: This viewport has scoped keyboard pan and zoom controls.
       tabIndex={0}
-      aria-label={`Interactive ${graphicName}. Use ${panKeys} to pan, plus or minus to zoom, and zero to fit.`}
+      aria-labelledby={labelledBy}
+      aria-label={`Interactive ${graphicName}`}
+      aria-description={`Use ${panKeys} to pan, plus or minus to zoom, and zero to fit.`}
     >
       <div
         ref={setStage}
@@ -378,6 +425,8 @@ export function DiagramPanHint() {
 
 export interface DiagramViewerProps extends Omit<DiagramRootProps, "children"> {
   stageRef?: Ref<HTMLDivElement>
+  /** ID of an existing label for the interactive viewport. */
+  viewportLabelledBy?: string
   toolbar?: "classic" | "grouped" | "canvas"
   /** Control placement in the canvas preset only. */
   canvasControls?: "docked" | "floating"
@@ -388,6 +437,7 @@ export interface DiagramViewerProps extends Omit<DiagramRootProps, "children"> {
 
 export function DiagramViewer({
   stageRef,
+  viewportLabelledBy,
   toolbar = "canvas",
   canvasControls = "floating",
   overview = toolbar === "canvas",
@@ -408,6 +458,7 @@ export function DiagramViewer({
         toolbar={toolbar}
         overview={overview}
         labels={buttonDisplay === "icon-and-text"}
+        viewportLabelledBy={viewportLabelledBy}
       />
     </DiagramRoot>
   )
@@ -425,7 +476,11 @@ function PresetButton({
   const binding = useDiagramAction(action)
   const path = distinctFit && action === "fit" ? "M2 2h12v12H2zM5 6h6v4H5z" : iconPaths[action]
   return (
-    <ControlButton {...binding} className={labels ? "ndv-labeled-button" : undefined}>
+    <ControlButton
+      {...binding}
+      className={labels ? "ndv-labeled-button" : undefined}
+      showTooltip={!labels}
+    >
       <ControlIcon path={path} />
       {labels && binding["aria-label"]}
     </ControlButton>
@@ -437,11 +492,13 @@ function ViewerContent({
   toolbar,
   overview,
   labels,
+  viewportLabelledBy,
 }: {
   stageRef?: Ref<HTMLDivElement>
   toolbar: NonNullable<DiagramViewerProps["toolbar"]>
   overview: boolean
   labels: boolean
+  viewportLabelledBy?: string
 }) {
   const { controller, options, state, stage, viewport, hostManaged, graphicName } =
     useDiagramContext()
@@ -493,6 +550,7 @@ function ViewerContent({
           type="button"
           className={labels ? "ndv-labeled-button" : undefined}
           aria-label="Overview"
+          showTooltip={!labels}
           aria-controls={overviewID}
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
@@ -553,7 +611,7 @@ function ViewerContent({
           </>
         )}
       </DiagramToolbar>
-      <DiagramViewport stageRef={stageRef} />
+      <DiagramViewport stageRef={stageRef} aria-labelledby={viewportLabelledBy} />
       {available && (
         <ViewerOverview id={overviewID} thumbnail={thumbnail} open={open} subscribe={subscribe} />
       )}

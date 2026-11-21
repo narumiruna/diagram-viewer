@@ -10,22 +10,46 @@
   </head>
   <body>
     <header class="intro">
-      <p class="package-name">@narumitw/diagram-viewer</p>
+      <p class="package-name">@narumitw/diagram-viewer <span>· Main branch preview</span></p>
       <h1>Diagram Viewer</h1>
-      <p>A React viewer with zoom, pan, source, and export controls for diagrams your app renders.</p>
-      <a class="jump-link" href="#compare">Compare settings ↓</a>
+      <p>Zoom, pan, and export diagrams in React.</p>
+      <nav class="section-nav" aria-label="On this page">
+        <a href="#compare">Compare settings</a>
+        <a href="#toolbar">Toolbar layout</a>
+        <a href="#canvas-controls">Canvas controls</a>
+        <a href="#button-display">Button labels</a>
+        <a href="#overview">Overview map</a>
+        <a href="#install">Install</a>
+      </nav>
     </header>
 
     <main>
       <section aria-labelledby="compare">
-        <h2 id="compare">Compare settings</h2>
-        <p class="section-intro">Each example uses the same SVG. Try the controls on each viewer to see what changes.</p>
-        <div id="examples"></div>
+        <h2 id="compare" tabindex="-1">Compare settings</h2>
         <noscript><p>Enable JavaScript to use the interactive examples.</p></noscript>
+        <section class="comparison" aria-labelledby="toolbar">
+          <h3 id="toolbar" tabindex="-1">Toolbar layout</h3>
+          <div id="toolbar-examples"></div>
+        </section>
+        <section class="comparison" aria-labelledby="canvas-controls">
+          <h3 id="canvas-controls" tabindex="-1">Canvas control placement</h3>
+          <p class="section-intro">On narrow viewers, both Canvas options use a full-width bottom bar.</p>
+          <div id="canvas-controls-examples"></div>
+        </section>
+        <section class="comparison" aria-labelledby="button-display">
+          <h3 id="button-display" tabindex="-1">Button labels</h3>
+          <div id="button-display-examples"></div>
+        </section>
+        <section class="comparison" aria-labelledby="overview">
+          <h3 id="overview" tabindex="-1">Overview map</h3>
+          <p class="section-intro">In the enabled example, open Overview and zoom in to see the frame track the visible area.</p>
+          <div id="overview-examples"></div>
+        </section>
       </section>
 
       <section class="install" aria-labelledby="install">
-        <h2 id="install">Use it in your app</h2>
+        <h2 id="install" tabindex="-1">Use it in your app</h2>
+        <p>This site previews the main branch. The install command fetches the latest stable release, which may not support the settings shown above. See the <a href="https://github.com/narumiruna/diagram-viewer/blob/main/CHANGELOG.md">release notes</a> for available features.</p>
         <p>Pass trusted or sanitized SVG to the viewer. Your app handles rendering and SVG sanitization.</p>
         <pre><code>npm install @narumitw/diagram-viewer</code></pre>
         <pre><code>import { DiagramViewer } from "@narumitw/diagram-viewer"
