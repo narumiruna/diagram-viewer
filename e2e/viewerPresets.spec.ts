@@ -584,7 +584,7 @@ for (const theme of ["light", "dark"] as const) {
         variants.push(
           ["classic-overview", "&toolbar=classic&overview"],
           ["classic", "&toolbar=classic"],
-          ["canvas-docked-overview", "&toolbar=canvas&overview"],
+          ["canvas-docked-overview", "&toolbar=canvas&controls=docked&overview"],
           ["canvas-floating-overview", "&overview"],
         )
       }
