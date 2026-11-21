@@ -410,7 +410,7 @@ function createController(
     }
   }
 
-  function downloadSVG(): void {
+  function downloadSvg(): void {
     // SVG download is deliberately raw; only PNG uses serializeDiagramSvg.
     const source = options.svg || stage.querySelector("svg")?.outerHTML
     if (!source) return
@@ -426,7 +426,7 @@ function createController(
     }
   }
 
-  async function downloadPNG(): Promise<void> {
+  async function downloadPng(): Promise<void> {
     const diagram = stage.querySelector("svg")
     if (!(diagram instanceof SVGSVGElement)) return
     const background = options.background ?? "#ffffff"
@@ -494,9 +494,9 @@ function createController(
         case "copy":
           return copy()
         case "svg":
-          return downloadSVG()
+          return downloadSvg()
         case "png":
-          return downloadPNG()
+          return downloadPng()
         case "retry":
           return options.retryRender?.()
       }
