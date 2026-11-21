@@ -70,7 +70,7 @@
   cursor: pointer;
 }
 
-.ndv-control:disabled {
+.ndv-control:is(:disabled, [aria-disabled="true"]) {
   opacity: 0.45;
   cursor: default;
 }
@@ -86,17 +86,23 @@
 
 .ndv-tooltip {
   position: absolute;
-  z-index: 1;
-  top: calc(100% + 4px);
+  z-index: 2;
+  top: 100%;
   left: 0;
   width: max-content;
-  max-width: 10rem;
+  max-width: min(10rem, calc(100vw - 8px));
   border-radius: 4px;
   padding: 0.4rem 0.6rem;
   background: var(--ndv-foreground);
   color: var(--ndv-background);
   font-size: 0.75rem;
-  pointer-events: none;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+}
+
+.ndv-tooltip[data-above] {
+  top: auto;
+  bottom: 100%;
 }
 
 .ndv-toolbar output {
@@ -282,22 +288,6 @@
   flex: none;
 }
 
-/* Keep the fallback inside the toolbar width instead of clipping it at a wrapped edge. */
-.ndv-viewer-alt .ndv-control-wrap {
-  position: static;
-}
-
-.ndv-viewer-alt .ndv-tooltip {
-  left: auto;
-  inset-inline-end: 0.75rem;
-  max-inline-size: min(10rem, calc(100% - 1.5rem));
-}
-
-.ndv-viewer-alt .ndv-camera .ndv-tooltip {
-  top: auto;
-  inset-block-end: calc(100% + 4px);
-}
-
 .ndv-viewer-alt.ndv-canvas {
   background-image: radial-gradient(
     circle,
@@ -361,41 +351,6 @@
   min-inline-size: 3rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
-}
-
-/* Where supported, keep tooltips next to the button, even as controls wrap. */
-@supports (anchor-scope: --ndv-trigger) and
-  (position-area: block-end span-inline-end) and
-  (position-try-fallbacks: flip-inline) {
-  .ndv-viewer-alt {
-    position: relative;
-  }
-
-  .ndv-viewer-alt > :is(.ndv-toolbar, .ndv-canvas-controls) {
-    position: static;
-  }
-
-  .ndv-viewer-alt .ndv-control-wrap {
-    anchor-scope: --ndv-trigger;
-  }
-
-  .ndv-viewer-alt .ndv-control {
-    anchor-name: --ndv-trigger;
-  }
-
-  .ndv-viewer-alt .ndv-tooltip {
-    inset: auto;
-    margin-block-start: 4px;
-    position-anchor: --ndv-trigger;
-    position-area: block-end span-inline-end;
-    position-try-fallbacks: flip-inline;
-  }
-
-  .ndv-viewer-alt .ndv-camera .ndv-tooltip {
-    inset: auto;
-    margin-block: 0 4px;
-    position-area: block-start span-inline-end;
-  }
 }
 
 .ndv-viewer-alt .ndv-overview:not([hidden]) {

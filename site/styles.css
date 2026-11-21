@@ -20,7 +20,7 @@
   }
 
   .intro {
-    padding-block: 2.5rem;
+    padding-block: 1rem;
     border-block-end: 1px solid var(--line);
     background: var(--surface);
   }
@@ -31,6 +31,12 @@
     font-family: ui-monospace, monospace;
     font-size: 0.875rem;
     overflow-wrap: anywhere;
+  }
+
+  .package-name span {
+    font-family: system-ui, sans-serif;
+    font-size: 0.75rem;
+    white-space: nowrap;
   }
 
   h1 {
@@ -50,14 +56,24 @@
   .section-intro,
   .install > p {
     max-inline-size: 65ch;
-    margin-block: 0.625rem 1rem;
+    margin-block: 0.375rem 0.5rem;
     color: var(--muted);
   }
 
-  .jump-link {
-    display: inline-block;
-    padding-block: 0.625rem;
+  .section-nav {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  :where(.section-nav) a {
+    padding-block: 0.25rem;
     font-weight: 650;
+  }
+
+  :is(h2, h3)[id] {
+    scroll-margin-block-start: 0.75rem;
   }
 
   a {
@@ -65,30 +81,36 @@
     text-underline-offset: 0.2em;
   }
 
-  a:focus-visible {
+  :is(a, summary):focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 3px;
   }
 
   main {
-    padding-block: 2.5rem;
+    padding-block: 1rem 2rem;
   }
 
   .comparison {
     container: comparison / inline-size;
-    margin-block: 2rem;
-    padding-block-start: 1.5rem;
+    margin-block: 1.5rem;
+    padding-block-start: 1rem;
     border-block-start: 1px solid var(--line);
+  }
+
+  .comparison:first-of-type {
+    margin-block-start: 0.5rem;
+    padding-block-start: 0;
+    border: 0;
   }
 
   .comparison-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 25rem), 1fr));
     gap: 1rem;
-    margin-block-start: 1rem;
+    margin-block-start: 0.625rem;
   }
 
-  #canvas-controls .comparison-grid {
+  #canvas-controls-examples .comparison-grid {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 39rem), 1fr));
   }
 
@@ -99,11 +121,11 @@
   }
 
   .example > p {
-    margin-block: 0.375rem 0.75rem;
+    margin-block: 0.25rem 0;
     color: var(--muted);
   }
 
-  .example > pre,
+  .example-code > pre,
   .install > pre {
     margin-block: 0 0.75rem;
     padding: 0.625rem 0.75rem;
@@ -115,8 +137,10 @@
     font-size: 0.875rem;
   }
 
-  .example > pre {
-    margin-block-start: auto;
+  .example-code > summary {
+    color: var(--accent);
+    cursor: pointer;
+    padding-block: 0.375rem;
   }
 
   .wide-reference {
@@ -161,5 +185,27 @@
 
   footer a {
     padding-block: 0.625rem;
+  }
+}
+
+.example > .ndv-root:not(:fullscreen, .diagram-expanded) {
+  margin-block: 0.625rem;
+}
+
+@media (hover: none) and (max-width: 30rem) {
+  .example .ndv-toolbar {
+    gap: 0.25rem;
+    padding: 0.375rem;
+    font-size: 0.75rem;
+  }
+
+  .example .ndv-toolbar output {
+    min-inline-size: 2.25rem;
+  }
+
+  .example .ndv-labeled-button {
+    gap: 0.25rem;
+    padding-inline: 0.375rem;
+    font-size: 0.75rem;
   }
 }

@@ -153,10 +153,10 @@ describe("DiagramViewer", () => {
     const { container } = renderViewer({ renderError: "Render failed.", retryRender })
     const stage = screen.getByRole("img", { name: "Mermaid diagram" })
     expect(stage).toHaveClass("mermaid-diagram")
-    expect(stage.parentElement).toBe(
-      screen.getByRole("region", {
-        name: "Interactive Mermaid diagram. Use arrow keys to pan, plus or minus to zoom, and zero to fit.",
-      }),
+    const viewport = screen.getByRole("region", { name: "Interactive Mermaid diagram" })
+    expect(stage.parentElement).toBe(viewport)
+    expect(viewport).toHaveAccessibleDescription(
+      "Use arrow keys to pan, plus or minus to zoom, and zero to fit.",
     )
     expect(container.querySelector(".diagram-card")).toHaveAttribute(
       "class",
@@ -199,7 +199,7 @@ describe("DiagramViewer", () => {
     expect(card).toContainElement(tooltip)
   })
 
-  it("enters and exits native fullscreen", async () => {
+  it("restores native fullscreen focus before an early exit finishes", async () => {
     const { container } = renderViewer()
     const card = container.querySelector(".diagram-card")
     if (!(card instanceof HTMLDivElement)) throw new Error("card missing")
@@ -212,17 +212,25 @@ describe("DiagramViewer", () => {
       active = card
       document.dispatchEvent(new Event("fullscreenchange"))
     })
+    const exit = Promise.withResolvers<void>()
     Object.defineProperty(document, "exitFullscreen", {
       configurable: true,
-      value: vi.fn(async () => {
+      value: vi.fn(() => {
         active = null
         document.dispatchEvent(new Event("fullscreenchange"))
+        return exit.promise
       }),
     })
-    fireEvent.click(screen.getByRole("button", { name: "Fullscreen" }))
-    await screen.findByRole("button", { name: "Exit fullscreen" })
+    const opener = screen.getByRole("button", { name: "Fullscreen" })
+    opener.focus()
+    fireEvent.click(opener)
+    await waitFor(() => expect(screen.getByRole("region", { name: /^Interactive/ })).toHaveFocus())
     fireEvent.click(screen.getByRole("button", { name: "Exit fullscreen" }))
-    await screen.findByRole("button", { name: "Fullscreen" })
+    expect(opener).toHaveAttribute("aria-disabled", "true")
+    await waitFor(() => expect(opener).toHaveFocus())
+    fireEvent.click(opener)
+    exit.resolve()
+    await waitFor(() => expect(opener).not.toHaveAttribute("aria-disabled"))
     expect(card.requestFullscreen).toHaveBeenCalledOnce()
     expect(document.exitFullscreen).toHaveBeenCalledOnce()
   })

@@ -12,7 +12,7 @@ import {
 } from "@narumitw/diagram-viewer"
 import { createDiagramView } from "@narumitw/diagram-viewer/core"
 import "@narumitw/diagram-viewer/styles.css"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 
 const svg =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50"><text x="5" y="20">Trusted SVG</text></svg>'
@@ -39,13 +39,18 @@ export function CanvasOverviewExample() {
 }
 
 export function GroupedLabelsExample() {
+  const heading = useId()
   return (
-    <DiagramViewer
-      source="graph TD; A-->B"
-      svg={svg}
-      toolbar="grouped"
-      buttonDisplay="icon-and-text"
-    />
+    <>
+      <h2 id={heading}>Sample workflow</h2>
+      <DiagramViewer
+        source="graph TD; A-->B"
+        svg={svg}
+        toolbar="grouped"
+        buttonDisplay="icon-and-text"
+        viewportLabelledBy={heading}
+      />
+    </>
   )
 }
 

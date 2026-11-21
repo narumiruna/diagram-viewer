@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, test } from "@playwright/test"
+import { devices, expect, type Locator, type Page, test } from "@playwright/test"
 
 const site = "http://127.0.0.1:4176/diagram-viewer/"
 
@@ -32,7 +32,22 @@ test("the built Pages site compares four settings on a real viewer", async ({ pa
   const classic = example(page, "Classic")
   const grouped = example(page, "Grouped")
   const canvas = example(page, "Canvas")
-  await expect(classic.getByRole("group")).toHaveCount(1)
+  await expect(classic.locator(".ndv-stage > svg")).toBeInViewport({ ratio: 0.1 })
+  const code = classic.getByText(/<DiagramViewer/)
+  await expect(code).toBeHidden()
+  await classic.getByText("View JSX").press("Enter")
+  await expect(code).toContainText('toolbar="classic"')
+  await expect(code).toBeVisible()
+  await classic.getByText("View JSX").press("Enter")
+  for (const article of await page.getByRole("article").all()) {
+    const name = await article.getByRole("heading").textContent()
+    const region = article.getByRole("region", { name: name ?? "", exact: true })
+    await expect(region).toHaveAccessibleDescription(
+      "Use arrow keys to pan, plus or minus to zoom, and zero to fit.",
+    )
+  }
+  await expect(page.getByRole("region", { name: /^Interactive diagram/ })).toHaveCount(0)
+  await expect(classic.locator("fieldset")).toHaveCount(1)
   await expect(grouped.locator(".ndv-control-group")).toHaveCount(3)
   await expect(canvas.getByRole("group", { name: "Diagram view controls" })).toBeVisible()
   expect(
@@ -150,6 +165,79 @@ test("intermediate and narrow screens keep live results readable", async ({ page
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(320)
 })
 
+test("section links work by keyboard and on direct load", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 })
+  await page.goto(site)
+  await page.getByRole("link", { name: "Install", exact: true }).press("Enter")
+  await expect(page).toHaveURL(`${site}#install`)
+  const install = page.getByRole("heading", { name: "Use it in your app" })
+  await expect(install).toBeInViewport()
+  await expect(install).toBeFocused()
+
+  const sections = {
+    toolbar: "Toolbar layout",
+    "canvas-controls": "Canvas control placement",
+    "button-display": "Button labels",
+    overview: "Overview map",
+    install: "Use it in your app",
+  }
+  for (const [id, name] of Object.entries(sections)) {
+    await page.goto("about:blank")
+    await page.goto(`${site}#${id}`)
+    await expect(page.getByRole("article")).toHaveCount(9)
+    await expect(page.getByRole("heading", { name, exact: true })).toBeInViewport()
+  }
+})
+
+test("tooltips fit at the screen edge, remain hoverable, and dismiss on Escape", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 720 })
+  await page.goto(site)
+  const classic = example(page, "Classic")
+  const trigger = button(classic, "Download PNG")
+  const tooltip = classic.getByRole("tooltip", { name: "Download PNG" })
+  await trigger.hover()
+  await expect(tooltip).toBeVisible()
+  const bounds = await tooltip.boundingBox()
+  if (!bounds) throw new Error("Expected a tooltip")
+  expect(bounds.x).toBeGreaterThanOrEqual(0)
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(320)
+  expect(bounds.y).toBeGreaterThanOrEqual(0)
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(720)
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, { steps: 8 })
+  await expect(tooltip).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(tooltip).toHaveCount(0)
+  await trigger.focus()
+  await expect(tooltip).toBeVisible()
+  await page.mouse.move(0, 0)
+  await expect(tooltip).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(tooltip).toHaveCount(0)
+  await expect(trigger).toBeFocused()
+})
+
+test("touch demos show action labels before activation", async ({ browser }) => {
+  const page = await browser.newPage(devices["iPhone 13"])
+  try {
+    await page.goto(site)
+    const classic = example(page, "Classic")
+    await expect(classic.locator(".ndv-stage > svg")).toBeInViewport({ ratio: 0.1 })
+    const icons = example(page, "Icons")
+    const zoom = button(icons, "Zoom in")
+    await expect(zoom).toHaveText("Zoom in")
+    await expect(icons.getByText(/shows labels on touch screens/)).toBeVisible()
+    const previousZoom = await icons.locator("output").textContent()
+    await zoom.tap()
+    await expect(icons.locator("output")).not.toHaveText(previousZoom ?? "")
+    await expect(icons.getByRole("tooltip")).toHaveCount(0)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
+  } finally {
+    await page.close()
+  }
+})
+
 test("the HTML introduction and documentation work without JavaScript", async ({ browser }) => {
   const page = await browser.newPage({ javaScriptEnabled: false })
   try {
@@ -157,6 +245,12 @@ test("the HTML introduction and documentation work without JavaScript", async ({
     await expect(page.getByRole("heading", { name: "Diagram Viewer", exact: true })).toBeVisible()
     await expect(page.locator("noscript p")).toHaveText(
       "Enable JavaScript to use the interactive examples.",
+    )
+    await expect(page.getByText("Main branch preview", { exact: false }).first()).toBeVisible()
+    await expect(page.getByText(/latest stable release/)).toBeVisible()
+    await expect(page.getByRole("link", { name: "release notes" })).toHaveAttribute(
+      "href",
+      "https://github.com/narumiruna/diagram-viewer/blob/main/CHANGELOG.md",
     )
     await expect(page.getByText("npm install @narumitw/diagram-viewer")).toBeVisible()
     await expect(page.getByRole("link", { name: "Full documentation" })).toHaveAttribute(

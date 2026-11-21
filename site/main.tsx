@@ -1,5 +1,7 @@
 import { DiagramViewer, type DiagramViewerProps } from "@narumitw/diagram-viewer"
 import "@narumitw/diagram-viewer/styles.css"
+import { useSyncExternalStore } from "react"
+import { flushSync } from "react-dom"
 import { createRoot } from "react-dom/client"
 import svg from "./diagram.svg?raw"
 
@@ -12,17 +14,21 @@ type Settings = Pick<
   "toolbar" | "canvasControls" | "buttonDisplay" | "overview"
 >
 type Example = { label: string; caption: string; settings: Settings }
-type Comparison = { id: string; title: string; note?: string; examples: Example[] }
+type Comparison = { id: string; examples: Example[] }
+
+const touchInput = window.matchMedia("(hover: none)")
+function subscribeToTouchInput(listener: () => void) {
+  touchInput.addEventListener("change", listener)
+  return () => touchInput.removeEventListener("change", listener)
+}
 
 const comparisons: Comparison[] = [
   {
     id: "toolbar",
-    title: "Toolbar layout",
-    note: "Overview is off in all three examples to isolate the layout. Canvas normally offers it.",
     examples: [
       {
         label: "Classic",
-        caption: "All actions share one toolbar above the diagram.",
+        caption: "All actions sit above the diagram.",
         settings: { toolbar: "classic", overview: false },
       },
       {
@@ -39,8 +45,6 @@ const comparisons: Comparison[] = [
   },
   {
     id: "canvas-controls",
-    title: "Canvas control placement",
-    note: "This setting applies only to Canvas. On narrow viewers both options use a full-width bottom bar.",
     examples: [
       {
         label: "Docked",
@@ -56,7 +60,6 @@ const comparisons: Comparison[] = [
   },
   {
     id: "button-display",
-    title: "Button labels",
     examples: [
       {
         label: "Icons",
@@ -72,8 +75,6 @@ const comparisons: Comparison[] = [
   },
   {
     id: "overview",
-    title: "Overview map",
-    note: "In the enabled example, open Overview and zoom in to see the frame track the visible area.",
     examples: [
       {
         label: "Overview off",
@@ -99,30 +100,42 @@ const comparisons: Comparison[] = [
   },
 ]
 
-function Preview({ example, id }: { example: Example; id: string }) {
+function Preview({ example, id, touch }: { example: Example; id: string; touch: boolean }) {
   const props = Object.entries(example.settings).map(([name, value]) =>
     typeof value === "boolean" ? `${name}={${value}}` : `${name}="${value}"`,
   )
   return (
     <article className="example" aria-labelledby={id}>
       <h4 id={id}>{example.label}</h4>
-      <p>{example.caption}</p>
-      <pre>
-        <code>{`<DiagramViewer\n  source={source}\n  svg={svg}\n  ${props.join("\n  ")}\n/>`}</code>
-      </pre>
-      <DiagramViewer source={source} svg={svg} {...example.settings} />
+      <p>
+        {touch && example.settings.buttonDisplay === "icon"
+          ? "This demo shows labels on touch screens so you can identify actions before tapping."
+          : example.caption}
+      </p>
+      <DiagramViewer
+        source={source}
+        svg={svg}
+        {...example.settings}
+        buttonDisplay={touch ? "icon-and-text" : example.settings.buttonDisplay}
+        viewportLabelledBy={id}
+      />
+      <details className="example-code">
+        <summary>View JSX</summary>
+        <pre>
+          <code>{`<DiagramViewer\n  source={source}\n  svg={svg}\n  ${props.join("\n  ")}\n/>`}</code>
+        </pre>
+      </details>
     </article>
   )
 }
 
-function Comparisons() {
-  return comparisons.map(({ id, title, note, examples }) => (
-    <section className="comparison" key={id} id={id} aria-labelledby={`${id}-title`}>
-      <h3 id={`${id}-title`}>{title}</h3>
-      {note && <p className="section-intro">{note}</p>}
+function ComparisonExamples({ id, examples }: Comparison) {
+  const touch = useSyncExternalStore(subscribeToTouchInput, () => touchInput.matches)
+  return (
+    <>
       <div className="comparison-grid">
         {examples.map((example, index) => (
-          <Preview example={example} id={`${id}-${index + 1}`} key={example.label} />
+          <Preview example={example} id={`${id}-${index + 1}`} key={example.label} touch={touch} />
         ))}
       </div>
       {id === "canvas-controls" && (
@@ -137,9 +150,16 @@ function Comparisons() {
           />
         </figure>
       )}
-    </section>
-  ))
+    </>
+  )
 }
 
-const examples = document.getElementById("examples")
-if (examples) createRoot(examples).render(<Comparisons />)
+flushSync(() => {
+  for (const comparison of comparisons) {
+    const mount = document.getElementById(`${comparison.id}-examples`)
+    if (mount) createRoot(mount).render(<ComparisonExamples {...comparison} />)
+  }
+})
+
+// The static targets can move when the diagrams above them mount.
+requestAnimationFrame(() => document.querySelector("main :target")?.scrollIntoView())
