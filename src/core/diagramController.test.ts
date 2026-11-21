@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   createDiagramController,
+  createDiagramControllerWithGeometry,
   type DiagramController,
   type DiagramOptions,
   getDiagramAction,
@@ -45,13 +46,15 @@ function dragPointer(type: "pointerdown" | "pointermove", clientX: number) {
   })
 }
 
-function fixture(options: DiagramOptions = { source: "source" }) {
+function fixtureElements(
+  svg = '<svg viewBox="0 0 1000 500"><text style="font-size:10px">Label</text></svg>',
+) {
   const root = document.createElement("div")
   const button = document.createElement("button")
   const viewport = document.createElement("section")
   viewport.tabIndex = 0
   const stage = document.createElement("div")
-  stage.innerHTML = '<svg viewBox="0 0 1000 500"><text style="font-size:10px">Label</text></svg>'
+  stage.innerHTML = svg
   viewport.append(stage)
   root.append(button, viewport)
   document.body.append(root)
@@ -59,9 +62,14 @@ function fixture(options: DiagramOptions = { source: "source" }) {
     clientWidth: { configurable: true, value: 500 },
     clientHeight: { configurable: true, value: 300 },
   })
-  const controller = createDiagramController({ root, viewport, stage }, options)
+  return { root, button, viewport, stage }
+}
+
+function fixture(options: DiagramOptions = { source: "source" }) {
+  const elements = fixtureElements()
+  const controller = createDiagramController(elements, options)
   controllers.push(controller)
-  return { controller, root, button, viewport, stage }
+  return { controller, ...elements }
 }
 
 beforeEach(() => {
@@ -383,6 +391,100 @@ describe("diagram controller", () => {
     controller.update({ source: "ignored" })
     controller.refresh()
     expect(controller.getState()).toBe(snapshot)
+  })
+})
+
+describe("visible region", () => {
+  const entireStage = { x: 0, y: 0, width: 1, height: 1 }
+
+  it("clips the padded viewport to the measured stage after fit, zoom, pan, and resize", () => {
+    const elements = fixtureElements('<svg viewBox="-75 125 1000 500"></svg>')
+    const { viewport } = elements
+    viewport.style.padding = "30px 50px 10px"
+    const controller = createDiagramControllerWithGeometry(elements, { source: "source" })
+    controllers.push(controller)
+    const onRegion = vi.fn()
+    controller.subscribeVisibleRegion(onRegion)
+    expect(onRegion).toHaveBeenCalledExactlyOnceWith(entireStage)
+
+    controller.run("zoomIn")
+    expect(onRegion).toHaveBeenLastCalledWith({ x: 0.1, y: 0, width: 0.8, height: 1 })
+    const snapshot = controller.getState()
+    expect(snapshot).toMatchObject({ scale: 0.5, cropped: true })
+    const onState = vi.fn()
+    controller.subscribe(onState)
+
+    viewport.dispatchEvent(dragPointer("pointerdown", 250))
+    document.dispatchEvent(dragPointer("pointermove", 210))
+    expect(onRegion).toHaveBeenLastCalledWith({ x: 0.18, y: 0, width: 0.8, height: 1 })
+
+    Object.defineProperties(viewport, {
+      clientWidth: { value: 400 },
+      clientHeight: { value: 200 },
+    })
+    controller.refresh()
+    expect(onRegion).toHaveBeenLastCalledWith({ x: 0.28, y: 0.18, width: 0.6, height: 0.64 })
+
+    document.dispatchEvent(dragPointer("pointermove", -200))
+    expect(onRegion).toHaveBeenLastCalledWith({ x: 0.4, y: 0.18, width: 0.6, height: 0.64 })
+    document.dispatchEvent(dragPointer("pointermove", -400))
+    expect(onRegion).toHaveBeenCalledTimes(5)
+    expect(onState).not.toHaveBeenCalled()
+    expect(controller.getState()).toBe(snapshot)
+
+    controller.run("fit")
+    expect(onRegion).toHaveBeenLastCalledWith(entireStage)
+  })
+
+  it("waits for valid geometry and stops notifying on unsubscribe or destroy", () => {
+    const elements = fixtureElements("")
+    const { stage, viewport } = elements
+    const controller = createDiagramControllerWithGeometry(elements, { source: "source" })
+    controllers.push(controller)
+    const first = vi.fn()
+    const unsubscribe = controller.subscribeVisibleRegion(first)
+    expect(first).not.toHaveBeenCalled()
+
+    stage.innerHTML = '<svg viewBox="0 0 1000 500"></svg>'
+    controller.refresh()
+    expect(first).toHaveBeenCalledExactlyOnceWith(entireStage)
+    const second = vi.fn()
+    controller.subscribeVisibleRegion(second)
+    expect(second).toHaveBeenCalledExactlyOnceWith(entireStage)
+    unsubscribe()
+
+    controller.run("zoomIn")
+    expect(first).toHaveBeenCalledOnce()
+    expect(second).toHaveBeenLastCalledWith({ x: 0.1, y: 0.02, width: 0.8, height: 0.96 })
+
+    const unavailable = vi.fn()
+    viewport.hidden = true
+    controller.subscribeVisibleRegion(unavailable)()
+    viewport.hidden = false
+    Object.defineProperty(viewport, "clientWidth", { value: 0 })
+    controller.subscribeVisibleRegion(unavailable)()
+    expect(unavailable).not.toHaveBeenCalled()
+
+    controller.destroy()
+    controller.subscribeVisibleRegion(unavailable)()
+    controller.refresh()
+    expect(second).toHaveBeenCalledTimes(2)
+    expect(unavailable).not.toHaveBeenCalled()
+  })
+
+  it("does not expose geometry or publish state for a legacy same-scale pan", () => {
+    const { controller, viewport, stage } = fixture()
+    expect(controller).not.toHaveProperty("subscribeVisibleRegion")
+    controller.run("zoomIn")
+    const snapshot = controller.getState()
+    const onState = vi.fn()
+    controller.subscribe(onState)
+    const transform = stage.style.transform
+    viewport.dispatchEvent(dragPointer("pointerdown", 250))
+    document.dispatchEvent(dragPointer("pointermove", 210))
+    expect(stage.style.transform).not.toBe(transform)
+    expect(controller.getState()).toBe(snapshot)
+    expect(onState).not.toHaveBeenCalled()
   })
 })
 

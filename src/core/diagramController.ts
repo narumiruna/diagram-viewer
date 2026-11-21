@@ -166,6 +166,25 @@ export function createDiagramController(
   elements: { root: HTMLElement; viewport: HTMLElement; stage: HTMLElement },
   initialOptions: DiagramOptions,
 ): DiagramController {
+  return createController(elements, initialOptions).controller
+}
+
+/** Internal camera geometry for the React Overview. Rectangles are normalized to the stage. */
+export function createDiagramControllerWithGeometry(
+  elements: { root: HTMLElement; viewport: HTMLElement; stage: HTMLElement },
+  initialOptions: DiagramOptions,
+): DiagramController & {
+  /** Sends the current region if usable, then sends changed regions after camera updates. */
+  subscribeVisibleRegion(listener: (region: Readonly<DiagramRegion>) => void): () => void
+} {
+  const { controller, subscribeVisibleRegion } = createController(elements, initialOptions)
+  return Object.assign(controller, { subscribeVisibleRegion })
+}
+
+function createController(
+  elements: { root: HTMLElement; viewport: HTMLElement; stage: HTMLElement },
+  initialOptions: DiagramOptions,
+) {
   const { root, viewport, stage } = elements
   const document = root.ownerDocument
   let options = snapshotOptions(initialOptions)
@@ -297,7 +316,7 @@ export function createDiagramController(
     camera.refresh()
   }
 
-  const camera = createDiagramViewWithGestureControl(viewport, stage, {
+  const { camera, subscribeVisibleRegion } = createDiagramViewWithGestureControl(viewport, stage, {
     focusRegion: options.focusRegion,
     getKeyboardPan: () => options.keyboardPan,
     isInteractionEnabled: () => options.ready !== false && !state.showSource,
@@ -429,7 +448,7 @@ export function createDiagramController(
   document.addEventListener("keydown", closeOnEscape, true)
   publish()
 
-  return {
+  const controller: DiagramController = {
     getState: () => state,
     subscribe(listener) {
       if (destroyed) return () => {}
@@ -497,4 +516,5 @@ export function createDiagramController(
       listeners.clear()
     },
   }
+  return { controller, subscribeVisibleRegion }
 }

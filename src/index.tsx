@@ -13,15 +13,15 @@ import {
   useRef,
   useState,
 } from "react"
+import { createDiagramControllerWithGeometry } from "./core/diagramController.js"
 import {
-  createDiagramController,
   type DiagramAction,
-  type DiagramController,
   type DiagramOptions,
   type DiagramState,
   getDiagramAction,
   initialDiagramState,
 } from "./core/index.js"
+import { useOverviewThumbnail, ViewerOverview } from "./overview.js"
 
 export type {
   DiagramAction,
@@ -31,10 +31,12 @@ export type {
   DiagramState,
 } from "./core/index.js"
 
+type ViewerController = ReturnType<typeof createDiagramControllerWithGeometry>
+
 interface DiagramContextValue {
   options: DiagramOptions
   state: Readonly<DiagramState>
-  controller: RefObject<DiagramController | undefined>
+  controller: RefObject<ViewerController | undefined>
   root: { current: HTMLDivElement | null }
   viewport: { current: HTMLElement | null }
   stage: { current: HTMLDivElement | null }
@@ -77,7 +79,7 @@ export function DiagramRoot({
   const root = useRef<HTMLDivElement>(null)
   const viewport = useRef<HTMLElement>(null)
   const stage = useRef<HTMLDivElement>(null)
-  const controller = useRef<DiagramController | undefined>(undefined)
+  const controller = useRef<ViewerController | undefined>(undefined)
   const currentOptions = useRef(options)
   currentOptions.current = options
   const sourceID = useId()
@@ -85,7 +87,7 @@ export function DiagramRoot({
 
   useEffect(() => {
     if (!root.current || !viewport.current || !stage.current) return
-    const instance = createDiagramController(
+    const instance = createDiagramControllerWithGeometry(
       { root: root.current, viewport: viewport.current, stage: stage.current },
       currentOptions.current,
     )
@@ -194,20 +196,47 @@ export interface DiagramActionProps
 export function DiagramActionButton({
   action,
   children,
-  className,
   "aria-label": label,
   ...props
 }: DiagramActionProps) {
   const binding = useDiagramAction(action)
+  return (
+    <ControlButton {...props} {...binding} aria-label={label ?? binding["aria-label"]}>
+      {children ?? <ControlIcon path={iconPaths[action]} />}
+    </ControlButton>
+  )
+}
+
+function ControlIcon({ path }: { path: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={path} />
+    </svg>
+  )
+}
+
+function ControlButton({
+  children,
+  className,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement> }) {
   const tooltipID = useId()
   const [tooltip, setTooltip] = useState(false)
-  const name = label ?? binding["aria-label"]
+  const name = props["aria-label"]
   return (
     <span className="ndv-control-wrap">
       <button
         {...props}
-        {...binding}
-        aria-label={name}
         aria-describedby={tooltip ? tooltipID : undefined}
         className={`ndv-control diagram-control${className ? ` ${className}` : ""}`}
         onFocus={(event) => {
@@ -231,23 +260,9 @@ export function DiagramActionButton({
           props.onKeyDown?.(event)
         }}
       >
-        {children ?? (
-          <svg
-            aria-hidden="true"
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.25"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d={iconPaths[action]} />
-          </svg>
-        )}
+        {children}
       </button>
-      {tooltip && !binding.disabled && (
+      {tooltip && !props.disabled && (
         <span className="ndv-tooltip" id={tooltipID} role="tooltip">
           {name}
         </span>
@@ -363,16 +378,187 @@ export function DiagramPanHint() {
 
 export interface DiagramViewerProps extends Omit<DiagramRootProps, "children"> {
   stageRef?: Ref<HTMLDivElement>
+  toolbar?: "default" | "grouped" | "canvas"
+  /** Control placement in the canvas preset only. */
+  canvasControls?: "docked" | "floating"
+  /** Offer an initially closed Overview when a usable SVG thumbnail is available. */
+  overview?: boolean
+  buttonDisplay?: "icon" | "icon-and-text"
 }
 
-export function DiagramViewer({ stageRef, ...props }: DiagramViewerProps) {
+export function DiagramViewer({
+  stageRef,
+  toolbar = "default",
+  canvasControls = "docked",
+  overview = false,
+  buttonDisplay = "icon",
+  className,
+  ...props
+}: DiagramViewerProps) {
+  const classes = [className]
+  if (toolbar !== "default" || overview || buttonDisplay !== "icon") classes.push("ndv-viewer-alt")
+  if (toolbar === "canvas") {
+    classes.push("ndv-canvas")
+    if (canvasControls === "floating") classes.push("ndv-floating")
+  }
   return (
-    <DiagramRoot {...props}>
-      <DiagramDefaultToolbar />
-      <DiagramViewport stageRef={stageRef} />
-      <DiagramPanHint />
-      <DiagramSource />
-      <DiagramStatus />
+    <DiagramRoot {...props} className={classes.filter(Boolean).join(" ")}>
+      <ViewerContent
+        stageRef={stageRef}
+        toolbar={toolbar}
+        overview={overview}
+        labels={buttonDisplay === "icon-and-text"}
+      />
     </DiagramRoot>
+  )
+}
+
+function PresetButton({
+  action,
+  labels,
+  distinctFit,
+}: {
+  action: DiagramAction
+  labels: boolean
+  distinctFit: boolean
+}) {
+  const binding = useDiagramAction(action)
+  const path = distinctFit && action === "fit" ? "M2 2h12v12H2zM5 6h6v4H5z" : iconPaths[action]
+  return (
+    <ControlButton {...binding} className={labels ? "ndv-labeled-button" : undefined}>
+      <ControlIcon path={path} />
+      {labels && binding["aria-label"]}
+    </ControlButton>
+  )
+}
+
+function ViewerContent({
+  stageRef,
+  toolbar,
+  overview,
+  labels,
+}: {
+  stageRef?: Ref<HTMLDivElement>
+  toolbar: NonNullable<DiagramViewerProps["toolbar"]>
+  overview: boolean
+  labels: boolean
+}) {
+  const { controller, options, state, stage, viewport, hostManaged, graphicName } =
+    useDiagramContext()
+  const thumbnail = useOverviewThumbnail(overview && !hostManaged ? options.svg : undefined, stage)
+  const overviewID = useId()
+  const [open, setOpen] = useState(false)
+  const subscribe = useCallback<ViewerController["subscribeVisibleRegion"]>(
+    (listener) => controller.current?.subscribeVisibleRegion(listener) ?? (() => {}),
+    [controller],
+  )
+  const returnFocus = useCallback(
+    (button: HTMLButtonElement | null) => {
+      if (!button) return
+      return () => {
+        const target = viewport.current
+        if (
+          button.ownerDocument.activeElement === button &&
+          target?.isConnected &&
+          !target.hidden
+        ) {
+          target.focus({ preventScroll: true })
+        }
+      }
+    },
+    [viewport],
+  )
+  const available =
+    thumbnail && !state.showSource && options.ready !== false && !options.renderError
+  const canvas = toolbar === "canvas"
+  const action = (action: DiagramAction) => (
+    <PresetButton
+      key={action}
+      action={action}
+      labels={labels}
+      distinctFit={toolbar !== "default"}
+    />
+  )
+  const camera = (
+    <>
+      {action("zoomOut")}
+      <DiagramZoom />
+      {action("zoomIn")}
+      {action("fit")}
+      {action("reset")}
+      {action("fullscreen")}
+      {available && (
+        <ControlButton
+          ref={returnFocus}
+          type="button"
+          className={labels ? "ndv-labeled-button" : undefined}
+          aria-label="Overview"
+          aria-controls={overviewID}
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <ControlIcon path="m1.5 4 4.25-2 4.5 2 4.25-2v10l-4.25 2-4.5-2-4.25 2zM5.75 2v10m4.5-8v10" />
+          {labels && "Overview"}
+        </ControlButton>
+      )}
+    </>
+  )
+  const source = (
+    <>
+      {action("source")}
+      {action("copy")}
+    </>
+  )
+  const exports = (
+    <>
+      {action("svg")}
+      {action("png")}
+      {options.renderError && options.retryRender && action("retry")}
+    </>
+  )
+  const sourceView = <DiagramSource key="source" />
+  const lowerControls = canvas ? (
+    <div className="ndv-canvas-controls" key="controls">
+      <DiagramPanHint />
+      <DiagramToolbar className="ndv-camera" aria-label="Diagram view controls">
+        {camera}
+      </DiagramToolbar>
+    </div>
+  ) : (
+    <DiagramPanHint key="controls" />
+  )
+  return (
+    <>
+      <DiagramToolbar
+        className={toolbar === "default" ? undefined : "ndv-grouped-toolbar"}
+        aria-label={canvas ? "Diagram file controls" : undefined}
+      >
+        {toolbar === "default" ? (
+          <>
+            {camera}
+            {source}
+            {exports}
+          </>
+        ) : (
+          <>
+            {canvas && graphicName !== "diagram" && (
+              <span className="ndv-viewer-heading">
+                <strong>{graphicName}</strong>
+                {options.typeLabel && <small>{options.typeLabel}</small>}
+              </span>
+            )}
+            {!canvas && <div className="ndv-control-group">{camera}</div>}
+            <div className="ndv-control-group">{source}</div>
+            <div className="ndv-control-group">{exports}</div>
+          </>
+        )}
+      </DiagramToolbar>
+      <DiagramViewport stageRef={stageRef} />
+      {available && (
+        <ViewerOverview id={overviewID} thumbnail={thumbnail} open={open} subscribe={subscribe} />
+      )}
+      {canvas ? [sourceView, lowerControls] : [lowerControls, sourceView]}
+      <DiagramStatus />
+    </>
   )
 }

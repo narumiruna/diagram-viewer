@@ -21,6 +21,30 @@ export function DefaultExample() {
   return <DiagramViewer source="graph TD; A-->B" svg={svg} graphicName="Example diagram" />
 }
 
+export function CanvasOverviewExample() {
+  return (
+    <DiagramViewer
+      source="graph TD; A-->B"
+      svg={svg}
+      graphicName="Example diagram"
+      toolbar="canvas"
+      canvasControls="floating"
+      overview
+    />
+  )
+}
+
+export function GroupedLabelsExample() {
+  return (
+    <DiagramViewer
+      source="graph TD; A-->B"
+      svg={svg}
+      toolbar="grouped"
+      buttonDisplay="icon-and-text"
+    />
+  )
+}
+
 export function SlideFocusExample({ region }: { region?: DiagramRegion }) {
   return (
     <DiagramViewer
