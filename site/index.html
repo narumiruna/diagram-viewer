@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Compare Diagram Viewer settings on the same interactive diagram." />
+    <title>Diagram Viewer · Compare settings</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./main.tsx"></script>
+  </head>
+  <body>
+    <header class="intro">
+      <p class="package-name">@narumitw/diagram-viewer</p>
+      <h1>Diagram Viewer</h1>
+      <p>A React viewer with zoom, pan, source, and export controls for diagrams your app renders.</p>
+      <a class="jump-link" href="#compare">Compare settings ↓</a>
+    </header>
+
+    <main>
+      <section aria-labelledby="compare">
+        <h2 id="compare">Compare settings</h2>
+        <p class="section-intro">Each example uses the same SVG. Try the controls on each viewer to see what changes.</p>
+        <div id="examples"></div>
+        <noscript><p>Enable JavaScript to use the interactive examples.</p></noscript>
+      </section>
+
+      <section class="install" aria-labelledby="install">
+        <h2 id="install">Use it in your app</h2>
+        <p>Pass trusted or sanitized SVG to the viewer. Your app handles rendering and SVG sanitization.</p>
+        <pre><code>npm install @narumitw/diagram-viewer</code></pre>
+        <pre><code>import { DiagramViewer } from "@narumitw/diagram-viewer"
+import "@narumitw/diagram-viewer/styles.css"
+
+&lt;DiagramViewer source={source} svg={svg} /&gt;</code></pre>
+      </section>
+    </main>
+
+    <footer>
+      <nav aria-label="Project links">
+        <a href="https://github.com/narumiruna/diagram-viewer">GitHub</a>
+        <a href="https://www.npmjs.com/package/@narumitw/diagram-viewer">npm</a>
+        <a href="https://github.com/narumiruna/diagram-viewer#readme">Full documentation</a>
+      </nav>
+    </footer>
+  </body>
+</html>

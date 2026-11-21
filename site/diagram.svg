@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="260" viewBox="0 0 640 260" role="img" aria-label="Browser requests go to a cache, which connects to the API and storage">
+  <g fill="none" stroke="#486685" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M168 130h75m-9-6 9 6-9 6M392 130h40V62h40m-9-6 9 6-9 6M432 130v68h40m-9-6 9 6-9 6"/>
+  </g>
+  <g stroke="#486685" stroke-width="2" fill="#f1f6fc">
+    <rect x="24" y="96" width="144" height="68" rx="10"/>
+    <rect x="248" y="96" width="144" height="68" rx="10" fill="#d6eaff"/>
+    <rect x="477" y="28" width="139" height="68" rx="10"/>
+    <rect x="477" y="164" width="139" height="68" rx="10"/>
+  </g>
+  <g fill="#172e47" font-family="system-ui,sans-serif" font-weight="600" font-size="22" text-anchor="middle">
+    <text x="96" y="138">Browser</text>
+    <text x="320" y="138">Cache</text>
+    <text x="546" y="70">API</text>
+    <text x="546" y="206">Storage</text>
+  </g>
+</svg>
