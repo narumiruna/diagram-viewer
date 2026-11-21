@@ -4,6 +4,10 @@ React diagram frame, composable controls, and browser-only core. It has no
 Mermaid, Vega, Radix, or Morsel runtime dependency. Rendering stays in the host.
 The verified React and React DOM version is **19.3.1**. License: [MIT](LICENSE).
 
+Once GitHub Pages is enabled, the [project site](https://narumiruna.github.io/diagram-viewer/)
+lets you compare settings on the same interactive diagram, with JSX for each
+example.
+
 ## Install
 
 ```sh
@@ -350,6 +354,24 @@ Playwright output under `test-results/` is ignored by Git.
 To build and pack without publishing, run `npm pack --pack-destination /tmp`.
 To enable the Biome and zizmor Git hooks, install
 [prek](https://prek.j178.dev/installation/) and run `prek install`.
+
+## Project site
+
+With dependencies installed, build and serve the static site at its GitHub Pages
+path:
+
+```sh
+npm run build:site
+npm exec -- vite preview site --base /diagram-viewer/ --host 127.0.0.1
+```
+
+Open `http://127.0.0.1:4173/diagram-viewer/`. `npm run test:browser` also checks
+this build at the project path on desktop and narrow Chromium viewports.
+
+To enable publishing, set **Settings → Pages → Build and deployment → Source**
+to **GitHub Actions**. The [GitHub Pages workflow](.github/workflows/pages.yml)
+publishes `site/dist/` after pushes to `main`, or when run manually from `main`.
+It does not publish the npm package.
 
 ## Releases
 

@@ -1,0 +1,165 @@
+@layer site {
+  :root {
+    --ink: #162b42;
+    --muted: #465b70;
+    --line: #cbd8e5;
+    --surface: #f2f6fb;
+    --accent: #14589e;
+    font-family: system-ui, sans-serif;
+    line-height: 1.55;
+    color: var(--ink);
+    background: #fff;
+  }
+
+  body {
+    margin: 0;
+  }
+
+  body > :is(header, main, footer) {
+    padding-inline: max(1rem, calc((100% - 88rem) / 2));
+  }
+
+  .intro {
+    padding-block: 2.5rem;
+    border-block-end: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .package-name {
+    margin: 0;
+    color: var(--muted);
+    font-family: ui-monospace, monospace;
+    font-size: 0.875rem;
+    overflow-wrap: anywhere;
+  }
+
+  h1 {
+    margin-block: 0.125em 0;
+    font-size: clamp(2rem, 1.25rem + 4vw, 4rem);
+    line-height: 1.1;
+  }
+
+  h2,
+  h3,
+  h4 {
+    margin: 0;
+    line-height: 1.25;
+  }
+
+  .intro > p:not(.package-name),
+  .section-intro,
+  .install > p {
+    max-inline-size: 65ch;
+    margin-block: 0.625rem 1rem;
+    color: var(--muted);
+  }
+
+  .jump-link {
+    display: inline-block;
+    padding-block: 0.625rem;
+    font-weight: 650;
+  }
+
+  a {
+    color: var(--accent);
+    text-underline-offset: 0.2em;
+  }
+
+  a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  main {
+    padding-block: 2.5rem;
+  }
+
+  .comparison {
+    container: comparison / inline-size;
+    margin-block: 2rem;
+    padding-block-start: 1.5rem;
+    border-block-start: 1px solid var(--line);
+  }
+
+  .comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 25rem), 1fr));
+    gap: 1rem;
+    margin-block-start: 1rem;
+  }
+
+  #canvas-controls .comparison-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 39rem), 1fr));
+  }
+
+  .example {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
+
+  .example > p {
+    margin-block: 0.375rem 0.75rem;
+    color: var(--muted);
+  }
+
+  .example > pre,
+  .install > pre {
+    margin-block: 0 0.75rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.375rem;
+    background: var(--surface);
+    color: var(--ink);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 0.875rem;
+  }
+
+  .example > pre {
+    margin-block-start: auto;
+  }
+
+  .wide-reference {
+    display: none;
+    margin: 1.5rem 0 0;
+  }
+
+  .wide-reference > figcaption {
+    margin-block-end: 0.5rem;
+    font-weight: 650;
+  }
+
+  .wide-reference > img {
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+  }
+
+  @container comparison (inline-size < 39rem) {
+    .wide-reference {
+      display: block;
+    }
+  }
+
+  .install {
+    max-inline-size: 42rem;
+    padding-block-start: 1.5rem;
+    border-block-start: 1px solid var(--line);
+  }
+
+  footer {
+    padding-block: 1rem;
+    border-block-start: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  footer > nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.5rem;
+  }
+
+  footer a {
+    padding-block: 0.625rem;
+  }
+}

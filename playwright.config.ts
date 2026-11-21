@@ -19,11 +19,18 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  webServer: {
-    command: "vite test/browser --host 127.0.0.1 --port 4175 --strictPort",
-    url: "http://127.0.0.1:4175",
-    reuseExistingServer: false,
-    timeout: 60_000,
-  },
+  webServer: [
+    {
+      command: "vite test/browser --host 127.0.0.1 --port 4175 --strictPort",
+      url: "http://127.0.0.1:4175",
+      reuseExistingServer: false,
+    },
+    {
+      command:
+        "vite preview site --base /diagram-viewer/ --host 127.0.0.1 --port 4176 --strictPort",
+      url: "http://127.0.0.1:4176/diagram-viewer/",
+      reuseExistingServer: false,
+    },
+  ],
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 })
