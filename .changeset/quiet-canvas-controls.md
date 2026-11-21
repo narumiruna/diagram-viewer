@@ -2,4 +2,4 @@
 "@narumitw/diagram-viewer": minor
 ---
 
-Add optional grouped and canvas toolbars, docked or floating canvas controls, and a read-only Overview that shows the visible part of an SVG. Buttons remain icon-only by default, with an option to show labels. Existing viewers keep their current layout.
+Make the canvas layout the default, with floating controls that dock on narrow viewers and an initially closed Overview for eligible SVGs. When upgrading, set `toolbar="classic"` to restore the previous interface. The grouped toolbar, docked controls, and icon-and-text labels are also available. Buttons are icon-only by default.

@@ -31,8 +31,10 @@ function mockThumbnails() {
 }
 
 describe("viewer presets", () => {
-  it("keeps the original controls and stage when defaults are explicit", () => {
-    const { container, rerender } = render(<DiagramViewer source="test" svg={svg} />)
+  it("keeps the original controls when using classic without overrides", () => {
+    const { container, rerender } = render(
+      <DiagramViewer source="test" svg={svg} toolbar="classic" />,
+    )
     const original = container.innerHTML
     const stage = container.querySelector(".ndv-stage")
     expect(
@@ -42,7 +44,7 @@ describe("viewer presets", () => {
       <DiagramViewer
         source="test"
         svg={svg}
-        toolbar="default"
+        toolbar="classic"
         buttonDisplay="icon"
         overview={false}
       />,
@@ -52,7 +54,7 @@ describe("viewer presets", () => {
     expect(screen.queryByRole("button", { name: "Overview" })).not.toBeInTheDocument()
   })
 
-  it.each(["default", "grouped", "canvas"] as const)(
+  it.each(["classic", "grouped", "canvas"] as const)(
     "shares actions and label display in the %s preset",
     (toolbar) => {
       const retry = vi.fn()
@@ -71,7 +73,7 @@ describe("viewer presets", () => {
       }
       const fit = screen.getByRole("button", { name: "Fit to screen" })
       const fullscreen = screen.getByRole("button", { name: "Fullscreen" })
-      if (toolbar !== "default")
+      if (toolbar !== "classic")
         expect(fit.querySelector("path")?.getAttribute("d")).not.toBe(
           fullscreen.querySelector("path")?.getAttribute("d"),
         )
@@ -97,7 +99,7 @@ describe("viewer presets", () => {
 
   it("keeps the stage through layouts and restores open Overview after source mode", async () => {
     const { images, create } = mockThumbnails()
-    const props = { source: "test", svg, overview: true }
+    const props = { source: "test", svg, toolbar: "classic", overview: true } as const
     const { container, rerender } = render(<DiagramViewer {...props} />)
     const stage = container.querySelector(".ndv-stage")
     act(() => images[0]?.dispatchEvent(new Event("load")))

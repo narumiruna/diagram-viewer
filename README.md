@@ -37,30 +37,24 @@ export function Example() {
 }
 ```
 
-The default toolbar order is zoom out, zoom percentage, zoom in, fit, reset,
-fullscreen, source toggle, copy source, SVG download, and PNG download. A retry
-button appears only when both `renderError` and `retryRender` are supplied.
+The canvas layout is the default. It puts source and export controls at the
+top and view controls at the bottom. A retry button appears only when both
+`renderError` and `retryRender` are supplied.
 
 ### Choose a layout
 
-Existing viewers keep the default toolbar unless you opt in. The React
-`DiagramViewer` accepts these presentation options:
+The React `DiagramViewer` accepts these presentation options:
 
 | Prop | Values | Default | Behavior |
 | --- | --- | --- | --- |
-| `toolbar` | `"default"`, `"grouped"`, `"canvas"` | `"default"` | Keep the original toolbar, group actions at the top, or move view controls and the pan hint below a dotted canvas. |
-| `canvasControls` | `"docked"`, `"floating"` | `"docked"` | Only for the canvas preset. Use a full-width bottom bar or float the hint and controls at the bottom corners. Narrow viewers use the bottom bar. |
+| `toolbar` | `"classic"`, `"grouped"`, `"canvas"` | `"canvas"` | Use the original toolbar, group actions at the top, or place view controls and the pan hint at the bottom of a dotted canvas. |
+| `canvasControls` | `"docked"`, `"floating"` | `"floating"` | Only for the canvas preset. Use a full-width bottom bar or float the hint and controls at the bottom corners. Narrow viewers use the bottom bar. |
 | `buttonDisplay` | `"icon"`, `"icon-and-text"` | `"icon"` | Change all built-in Viewer buttons, including Overview. Icon-only buttons keep accessible names and pointer/keyboard tooltips. |
-| `overview` | `false`, `true` | `false` | Add an initially closed Overview next to the view controls in any preset, if a thumbnail is available. |
+| `overview` | `false`, `true` | `true` for `"canvas"`; `false` otherwise | Add an initially closed Overview next to the view controls in any preset, if a thumbnail is available. |
 
 ```tsx
-<DiagramViewer
-  source={source}
-  svg={svg}
-  toolbar="canvas"
-  canvasControls="floating"
-  overview
-/>
+// Keep the original interface when upgrading from 0.4 or earlier.
+<DiagramViewer source={source} svg={svg} toolbar="classic" />
 ```
 
 Overview is a read-only thumbnail. Its frame shows the part of the diagram
@@ -71,7 +65,10 @@ you return. Overview requires an SVG with a usable `viewBox`. It is not
 available in `hostManaged` mode. The thumbnail is a separate image; it does not
 inherit page styles and may be unavailable if the browser blocks blob images.
 
-These options do not affect custom controls composed with `DiagramRoot`.
+Existing calls without `toolbar` now use the canvas layout. Select
+`toolbar="classic"` to restore the original icon-only top toolbar, including
+its original control order, without adding an Overview button. These options
+do not affect custom controls composed with `DiagramRoot`.
 
 ## Compose controls
 
@@ -109,7 +106,8 @@ export function Composed({ source, svg }: { source: string; svg: string }) {
 
 Keep exactly one viewport and source view mounted in each root. Include
 `DiagramStatus` for polite action feedback and optionally `DiagramPanHint` for
-cropping instructions. `DiagramDefaultToolbar` can be used in a composed root.
+cropping instructions. `DiagramDefaultToolbar` can be used in a composed root. It still renders the
+classic top toolbar.
 `DiagramToolbar` is a native fieldset, not an ARIA toolbar: Tab follows DOM order,
 including custom controls. Arrow keys are camera shortcuts only on the viewport,
 not on toolbar controls, editable elements, source, or live chart inputs.

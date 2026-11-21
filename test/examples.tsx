@@ -21,6 +21,10 @@ export function DefaultExample() {
   return <DiagramViewer source="graph TD; A-->B" svg={svg} graphicName="Example diagram" />
 }
 
+export function ClassicExample() {
+  return <DiagramViewer source="graph TD; A-->B" svg={svg} toolbar="classic" />
+}
+
 export function CanvasOverviewExample() {
   return (
     <DiagramViewer
@@ -28,7 +32,7 @@ export function CanvasOverviewExample() {
       svg={svg}
       graphicName="Example diagram"
       toolbar="canvas"
-      canvasControls="floating"
+      canvasControls="docked"
       overview
     />
   )

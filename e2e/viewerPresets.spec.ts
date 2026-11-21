@@ -96,10 +96,8 @@ async function expectProjection(viewer: Locator) {
   return projection(viewer)
 }
 
-test("omitted options match explicit default and ignore canvas placement outside canvas", async ({
-  page,
-}) => {
-  const viewers = await openPreset(page, "&compare")
+test("classic keeps the original toolbar and ignores canvas placement", async ({ page }) => {
+  const viewers = await openPreset(page, "&toolbar=classic&compare")
   await expect(viewers).toHaveCount(2)
   for (const viewer of await viewers.all()) {
     await expectReady(viewer)
@@ -114,7 +112,27 @@ test("omitted options match explicit default and ignore canvas placement outside
   expect(markup[0]).toBe(markup[1])
 })
 
-for (const toolbar of ["default", "grouped", "canvas"]) {
+test("the package defaults to floating canvas controls and a closed, icon-only Overview", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  const viewer = await openPreset(page)
+  await expectReady(viewer)
+  const lane = viewer.locator(".ndv-canvas-controls")
+  const toggle = action(viewer, "Overview")
+  await expect(viewer).toHaveClass(/ndv-canvas.*ndv-floating/)
+  await expect(lane).toHaveCSS("pointer-events", "none")
+  await expect(toggle).toHaveText("")
+  await expect(toggle).toHaveAttribute("aria-expanded", "false")
+  await expect(viewer.locator(".ndv-overview")).toBeHidden()
+  await toggle.click()
+  await expectProjection(viewer)
+  await page.setViewportSize({ width: 380, height: 900 })
+  await expect(lane).toHaveCSS("pointer-events", "auto")
+  await expect(toggle).toHaveAttribute("aria-expanded", "true")
+})
+
+for (const toolbar of ["classic", "grouped", "canvas"]) {
   test(`${toolbar}: Overview disclosure, icon tooltips, and labeled targets`, async ({ page }) => {
     const viewer = await openPreset(page, `&toolbar=${toolbar}&overview`)
     await expectReady(viewer)
@@ -173,7 +191,7 @@ for (const toolbar of ["default", "grouped", "canvas"]) {
 for (const toolbar of ["grouped", "canvas"]) {
   test(`${toolbar}: all actions remain available without Overview`, async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"])
-    const viewer = await openPreset(page, `&toolbar=${toolbar}&failed`)
+    const viewer = await openPreset(page, `&toolbar=${toolbar}&failed&noOverview&controls=docked`)
     await expect(viewer).toHaveClass(/ndv-viewer-alt/)
     await expect(viewer.locator(".ndv-status")).toHaveText("Could not render the diagram.")
     const retry = action(viewer, "Retry sequence diagram")
@@ -333,7 +351,7 @@ test("source, fullscreen and preset changes keep the live stage and chosen camer
   await action(viewer, "Show sequence diagram").click()
   await expect(overview).toHaveAttribute("aria-expanded", "true")
   await expect(panel).toBeVisible()
-  for (const toolbar of ["canvas", "default", "grouped"]) {
+  for (const toolbar of ["canvas", "classic", "grouped"]) {
     await clickHost(page, `Use ${toolbar} toolbar`)
     await expect(overview).toHaveAttribute("aria-expanded", "true")
     await expect(stage).toBeVisible()
@@ -564,9 +582,10 @@ for (const theme of ["light", "dark"] as const) {
       const variants: [name: string, query: string][] = [["default", ""]]
       if (capture === "after") {
         variants.push(
-          ["default-overview", "&overview"],
+          ["classic-overview", "&toolbar=classic&overview"],
+          ["classic", "&toolbar=classic"],
           ["canvas-docked-overview", "&toolbar=canvas&overview"],
-          ["canvas-floating-overview", "&toolbar=canvas&controls=floating&overview"],
+          ["canvas-floating-overview", "&overview"],
         )
       }
       for (const [name, query] of variants) {

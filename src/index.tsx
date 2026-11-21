@@ -378,25 +378,25 @@ export function DiagramPanHint() {
 
 export interface DiagramViewerProps extends Omit<DiagramRootProps, "children"> {
   stageRef?: Ref<HTMLDivElement>
-  toolbar?: "default" | "grouped" | "canvas"
+  toolbar?: "classic" | "grouped" | "canvas"
   /** Control placement in the canvas preset only. */
   canvasControls?: "docked" | "floating"
-  /** Offer an initially closed Overview when a usable SVG thumbnail is available. */
+  /** Offer an initially closed Overview for usable SVGs. Defaults to true in the canvas preset only. */
   overview?: boolean
   buttonDisplay?: "icon" | "icon-and-text"
 }
 
 export function DiagramViewer({
   stageRef,
-  toolbar = "default",
-  canvasControls = "docked",
-  overview = false,
+  toolbar = "canvas",
+  canvasControls = "floating",
+  overview = toolbar === "canvas",
   buttonDisplay = "icon",
   className,
   ...props
 }: DiagramViewerProps) {
   const classes = [className]
-  if (toolbar !== "default" || overview || buttonDisplay !== "icon") classes.push("ndv-viewer-alt")
+  if (toolbar !== "classic" || overview || buttonDisplay !== "icon") classes.push("ndv-viewer-alt")
   if (toolbar === "canvas") {
     classes.push("ndv-canvas")
     if (canvasControls === "floating") classes.push("ndv-floating")
@@ -476,7 +476,7 @@ function ViewerContent({
       key={action}
       action={action}
       labels={labels}
-      distinctFit={toolbar !== "default"}
+      distinctFit={toolbar !== "classic"}
     />
   )
   const camera = (
@@ -530,10 +530,10 @@ function ViewerContent({
   return (
     <>
       <DiagramToolbar
-        className={toolbar === "default" ? undefined : "ndv-grouped-toolbar"}
+        className={toolbar === "classic" ? undefined : "ndv-grouped-toolbar"}
         aria-label={canvas ? "Diagram file controls" : undefined}
       >
-        {toolbar === "default" ? (
+        {toolbar === "classic" ? (
           <>
             {camera}
             {source}

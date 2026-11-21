@@ -198,7 +198,7 @@ function SlideDeck() {
 function PresetFixture() {
   const requestedToolbar = params.get("toolbar")
   const [toolbar, setToolbar] = useState<DiagramViewerProps["toolbar"]>(
-    requestedToolbar === "default" ||
+    requestedToolbar === "classic" ||
       requestedToolbar === "grouped" ||
       requestedToolbar === "canvas"
       ? requestedToolbar
@@ -225,7 +225,7 @@ function PresetFixture() {
     toolbar,
     canvasControls: controls === "docked" || controls === "floating" ? controls : undefined,
     buttonDisplay: display === "icon" || display === "icon-and-text" ? display : undefined,
-    overview: params.has("overview") || undefined,
+    overview: params.has("noOverview") ? false : params.has("overview") || undefined,
     source,
     svg,
     ready,
@@ -252,7 +252,7 @@ function PresetFixture() {
       <button type="button" onClick={() => setMounted((current) => !current)}>
         {mounted ? "Unmount preset" : "Mount preset"}
       </button>{" "}
-      {(["default", "grouped", "canvas"] as const).map((name) => (
+      {(["classic", "grouped", "canvas"] as const).map((name) => (
         <button type="button" key={name} onClick={() => setToolbar(name)}>
           Use {name} toolbar
         </button>
@@ -262,7 +262,7 @@ function PresetFixture() {
         {params.has("compare") && (
           <DiagramViewer
             {...props}
-            toolbar="default"
+            toolbar="classic"
             canvasControls="floating"
             buttonDisplay="icon"
           />
@@ -290,11 +290,12 @@ function App() {
       {mounted && (
         <>
           <section aria-labelledby="default-title">
-            <h2 id="default-title">Default {showClass ? "class" : "sequence"} diagram</h2>
+            <h2 id="default-title">Classic {showClass ? "class" : "sequence"} diagram</h2>
             <DiagramViewer
               source={source}
               svg={svg}
               style={theme}
+              toolbar="classic"
               className="default-viewer"
               graphicName="document diagram"
               filename="standalone-document"

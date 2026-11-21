@@ -160,7 +160,7 @@ describe("DiagramViewer", () => {
     )
     expect(container.querySelector(".diagram-card")).toHaveAttribute(
       "class",
-      "ndv-root diagram-card",
+      "ndv-root diagram-card ndv-viewer-alt ndv-canvas ndv-floating",
     )
     fireEvent.click(screen.getByRole("button", { name: "Retry diagram" }))
     expect(retryRender).toHaveBeenCalledOnce()

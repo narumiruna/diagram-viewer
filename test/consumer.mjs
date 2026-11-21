@@ -108,7 +108,7 @@ console.log("Core imports without browser globals, React, or renderers")
   )
   await writeFile(
     join(directory, "main.tsx"),
-    `import React from "react"; import {createRoot} from "react-dom/client"; import {DefaultExample, ComposedExample, HostMountExample} from "./examples"; createRoot(document.getElementById("root")!).render(<><DefaultExample/><ComposedExample/><HostMountExample/></>);`,
+    `import React from "react"; import {createRoot} from "react-dom/client"; import {DefaultExample, ComposedExample, HostMountExample, ClassicExample} from "./examples"; createRoot(document.getElementById("root")!).render(<><DefaultExample/><ComposedExample/><HostMountExample/><ClassicExample/></>);`,
   )
   // The examples use the automatic JSX transform, without a React namespace import.
   await writeFile(
@@ -146,6 +146,13 @@ console.log("Core imports without browser globals, React, or renderers")
   page.on("pageerror", (error) => errors.push(error.message))
   await page.goto(baseURL)
   const viewer = page.locator(".ndv-root").first()
+  assert.match((await viewer.getAttribute("class")) ?? "", /\bndv-canvas\b.*\bndv-floating\b/)
+  const overview = viewer.getByRole("button", { name: "Overview" })
+  await overview.waitFor()
+  assert.equal(await overview.getAttribute("aria-expanded"), "false")
+  const classic = page.locator(".ndv-root").nth(3)
+  assert.equal(await classic.getAttribute("class"), "ndv-root diagram-card")
+  assert.equal(await classic.getByRole("button", { name: "Overview" }).count(), 0)
   await viewer.getByRole("button", { name: "Zoom in" }).click()
   await page.waitForFunction(() => document.querySelector("output")?.textContent === "125%")
   assert.equal(await viewer.getByLabel("Current zoom").textContent(), "125%")
